@@ -32,6 +32,7 @@ export interface Ticket {
   confidence?: "High" | "Low";
   created_at?: string;
   closed_at?: string | null;
+  actual_hours?: number | null;
   deliverable_count?: number;
   // risk (lead, and the analyst's own queue)
   p_miss?: number | null;

@@ -1,4 +1,4 @@
-import type { CSSProperties, ElementType, ReactNode } from 'react';
+import { useEffect, type CSSProperties, type ElementType, type ReactNode } from 'react';
 import { X } from 'lucide-react';
 import { theme } from '../theme';
 
@@ -97,6 +97,11 @@ export function Loading({ error }: { error?: string | null }) {
 export function Modal({ title, onClose, children, width = 560 }: {
   title: string; onClose: () => void; children: ReactNode; width?: number;
 }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(35,37,43,0.35)', zIndex: 200,
       display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '60px 16px', overflowY: 'auto' }}>
