@@ -1,0 +1,57 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --color-background: #EFEFEF;
+  --color-card:       #FFFFFF;
+  --color-ink:        #23252B;
+  --color-accent:     #C47A57;
+  --color-grey:       #9EA0A5;
+  --color-track:      #E7E7E7;
+  --color-sage:       #5E8C7A;
+  --color-red:        #C2553D;
+  --color-sand:       #D9A066;
+
+  --color-dept-hr:        #C47A57;
+  --color-dept-it:        #23252B;
+  --color-dept-finance:   #5E8C7A;
+  --color-dept-marketing: #9EA0A5;
+
+  --font-family-sans: 'Inter', system-ui, sans-serif;
+  --radius-card: 20px;
+  --radius-pill: 9999px;
+  --spacing-pad:  24px;
+  --spacing-gap:  16px;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--color-background);
+  font-family: var(--font-family-sans);
+  color: var(--color-ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+#root {
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Diagonal-hatch SVG pattern used by HatchedBar */
+.hatch-pattern {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    #9EA0A5 0px,
+    #9EA0A5 1px,
+    transparent 1px,
+    transparent 6px
+  );
+}
+
+/* Stack multi-column layouts on narrow screens */
+@media (max-width: 900px) {
+  .fq-grid { grid-template-columns: 1fr !important; }
+}

@@ -1,1 +1,14 @@
-ignore
+backend/.venv/
+backend/data/raw/
+*.db
+uploads/
+__pycache__/
+*.pyc
+.env
+node_modules/
+web/dist/
+.ipynb_checkpoints/
+backend/artifacts/
+.claude/
+.history/
+*.log

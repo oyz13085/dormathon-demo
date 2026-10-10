@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: fairqueue-api
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt && python -m fairqueue.models.train
+    # Reseed on every start so the demo always begins from the same story
+    startCommand: python -m fairqueue.db.seed && uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: FRONTEND_URL
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
