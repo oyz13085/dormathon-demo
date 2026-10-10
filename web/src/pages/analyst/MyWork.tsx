@@ -5,6 +5,7 @@ import type { Deliverable, Feedback, SkillAdjustment } from '../../api/types';
 import { useApi, useSession } from '../../session';
 import { Button, Card, Empty, Field, Grid, Loading, Notice, Pill, Table, fmtDate, inputStyle, td } from '../../components/ui';
 import { DeliverableBody } from '../requester/CompletedWork';
+import { RevisionDetailsModal } from '../../components/RevisionDetailsModal';
 
 export default function MyWork() {
   const { user, analystId, meta } = useSession();
@@ -14,6 +15,7 @@ export default function MyWork() {
   const [category, setCategory] = useState('');
   const [reason, setReason] = useState('');
   const [msg, setMsg] = useState<string | null>(null);
+  const [revisionFor, setRevisionFor] = useState<Deliverable | null>(null);
 
   async function flag() {
     try {
@@ -33,10 +35,13 @@ export default function MyWork() {
               <div key={d.id} style={{ paddingBottom: 12, borderBottom: `1px solid ${theme.colors.track}` }}>
                 <DeliverableBody d={d} />
                 {d.requester_rating && (
-                  <div style={{ marginTop: 6 }}>
+                  <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                     <Pill color={d.requester_rating === 'Useful' ? theme.colors.sage : theme.colors.red}>
                       Requester: {d.requester_rating}{d.revision_note ? `: ${d.revision_note}` : ''}
                     </Pill>
+                    {d.requester_rating === 'Needs revision' && (
+                      <Button small variant="outline" onClick={() => setRevisionFor(d)}>View Revision Details</Button>
+                    )}
                   </div>
                 )}
               </div>
@@ -84,6 +89,7 @@ export default function MyWork() {
           </div>
         </Card>
       </div>
+      {revisionFor && <RevisionDetailsModal deliverable={revisionFor} user={user} onClose={() => setRevisionFor(null)} />}
     </Grid>
   );
 }

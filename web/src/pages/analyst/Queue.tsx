@@ -2,10 +2,11 @@ import { useState } from 'react';
 import { CalendarDays, Play, Pause, CheckCircle } from 'lucide-react';
 import { theme } from '../../theme';
 import { api, qs } from '../../api/client';
-import type { Leave, Ticket, WhatIf, Workload } from '../../api/types';
+import type { Leave, Ticket, Workload } from '../../api/types';
 import { useApi, useSession } from '../../session';
 import { HalfDonutGauge } from '../../components/HalfDonutGauge';
 import { TicketTable } from '../../components/TicketTable';
+import { RequestLeaveModal } from '../../components/leave/RequestLeaveModal';
 import { Button, Card, Field, Grid, Loading, Modal, Notice, Pill, fmtDate, inputStyle } from '../../components/ui';
 
 export default function Queue() {
@@ -87,7 +88,7 @@ export default function Queue() {
           onDone={text => { setClosing(null); setMsg({ tone: 'ok', text }); refresh(); }} />
       )}
       {leaveOpen && analystId && (
-        <RequestLeave analystId={analystId} onClose={() => setLeaveOpen(false)}
+        <RequestLeaveModal analystId={analystId} onClose={() => setLeaveOpen(false)} onChanged={refresh}
           onDone={w => { setLeaveOpen(false); setMsg({ tone: 'ok', text: `Leave requested. The team lead sees the impact: ${w.summary}` }); refresh(); }} />
       )}
     </div>
@@ -179,43 +180,6 @@ function CloseTicket({ ticket, analystId, analysts, onClose, onDone }: {
         {error && <Notice tone="error">{error}</Notice>}
         <div style={{ display: 'flex', gap: 8 }}>
           <Button onClick={submit} disabled={busy}>{busy ? 'Closing…' : 'Close ticket'}</Button>
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
-        </div>
-      </div>
-    </Modal>
-  );
-}
-
-function RequestLeave({ analystId, onClose, onDone }: { analystId: number; onClose: () => void; onDone: (w: WhatIf) => void }) {
-  const today = new Date();
-  const monday = new Date(today);
-  monday.setDate(today.getDate() + ((8 - today.getDay()) % 7 || 7));
-  const friday = new Date(monday);
-  friday.setDate(monday.getDate() + 4);
-  const [start, setStart] = useState(monday.toISOString().slice(0, 10));
-  const [end, setEnd] = useState(friday.toISOString().slice(0, 10));
-  const [reason, setReason] = useState('Annual leave');
-  const [error, setError] = useState<string | null>(null);
-
-  async function submit() {
-    try {
-      const r = await api.post<Leave & { whatif: WhatIf }>('/planning/leave', { analyst_id: analystId, start_date: start, end_date: end, reason });
-      onDone(r.whatif);
-    } catch (e) { setError((e as Error).message); }
-  }
-
-  return (
-    <Modal title="Request leave" onClose={onClose} width={460}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <Grid cols="1fr 1fr">
-          <Field label="From"><input type="date" value={start} onChange={e => setStart(e.target.value)} style={inputStyle} /></Field>
-          <Field label="To"><input type="date" value={end} onChange={e => setEnd(e.target.value)} style={inputStyle} /></Field>
-        </Grid>
-        <Field label="Reason"><input value={reason} onChange={e => setReason(e.target.value)} style={inputStyle} /></Field>
-        <p style={{ margin: 0, fontSize: 12, color: theme.colors.grey }}>Your team lead will see which deadlines would be affected and who could take each one over.</p>
-        {error && <Notice tone="error">{error}</Notice>}
-        <div style={{ display: 'flex', gap: 8 }}>
-          <Button onClick={submit}>Send request</Button>
           <Button variant="ghost" onClick={onClose}>Cancel</Button>
         </div>
       </div>

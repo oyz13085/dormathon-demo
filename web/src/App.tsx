@@ -20,7 +20,7 @@ import OverrideLog from './pages/lead/OverrideLog';
 const NAV: Record<Role, { label: string; path: string }[]> = {
   requester: [
     { label: 'New request', path: '/requester/new' },
-    { label: 'My tickets', path: '/requester/tickets' },
+    { label: 'Tickets Assigned', path: '/requester/tickets' },
     { label: 'My completed work', path: '/requester/completed' },
   ],
   analyst: [
