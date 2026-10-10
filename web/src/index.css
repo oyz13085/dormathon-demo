@@ -92,3 +92,7 @@ body {
 
 /* Right-column tiles: the last tile absorbs leftover height so the column matches the form */
 .rq-tiles > :last-child { flex: 1; }
+
+/* Clickable cards: a small lift on hover */
+.fq-lift { transition: transform .12s ease, box-shadow .12s ease; }
+.fq-lift:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(35,37,43,0.10) !important; }

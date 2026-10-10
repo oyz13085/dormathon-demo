@@ -11,8 +11,9 @@ router = APIRouter()
 
 
 @router.get("/forecast")
-def forecast(n_weeks: int = Query(2, ge=1, le=8), division: str | None = None):
-    return _forecast(n_weeks, division)
+def forecast(n_weeks: int = Query(2, ge=1, le=8), division: str | None = None,
+             history_weeks: int = Query(0, ge=0, le=12)):
+    return _forecast(n_weeks, division, history_weeks)
 
 
 @router.get("/whatif/leave")

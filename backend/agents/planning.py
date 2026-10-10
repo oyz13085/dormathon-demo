@@ -69,6 +69,17 @@ def _fallback(question: str) -> dict:
         top = "; ".join(f"'{x['ticket_title']}' ({round(x['p_miss'] * 100)}%, {x['cause']})" for x in r["alerts"])
         return {"answer": f"{len(r['alerts'])} ticket(s) are above the alert threshold" + (f": {top}." if top else "."),
                 "data": r["alerts"], "method": "rule-based"}
+    if any(w in q for w in ("spare", "free", "who has", "who can", "available", "busy", "workload", "overload")):
+        from fairqueue.engine.schedule import open_hours
+        rows = sorted(({"name": a["name"], "free": round(a["weekly_hours"] - open_hours(a["id"]), 1),
+                        "weekly": a["weekly_hours"]} for a in repo.get_analysts()), key=lambda r: -r["free"])
+        free = [r for r in rows if r["free"] > 0]
+        full = [r["name"] for r in rows if r["free"] <= 0]
+        answer = ("Most free this week: " + ", ".join(f"{r['name']} ({r['free']:g}h of {r['weekly']:g}h)" for r in free[:3]) + "."
+                  if free else "Nobody has free hours this week.")
+        if full:
+            answer += f" Fully booked: {', '.join(full)}."
+        return {"answer": answer, "data": rows, "method": "rule-based"}
     f = forecast(2)
     return {"answer": " ".join(w["message"] for w in f["weeks"]), "data": f, "method": "rule-based"}
 
