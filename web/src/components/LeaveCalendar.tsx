@@ -59,6 +59,7 @@ function eventStyleGetter(event: LeaveEvent) {
 
 export function LeaveCalendar({ events, onSelectEvent }: Props) {
   const [view, setView] = useState<'month' | 'week'>('month');
+  const [date, setDate] = useState(() => new Date());   // the period being shown; Today / Back / Next move it
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -79,6 +80,8 @@ export function LeaveCalendar({ events, onSelectEvent }: Props) {
           startAccessor="start"
           endAccessor="end"
           view={view}
+          date={date}
+          onNavigate={d => setDate(d)}
           onView={v => (v === 'month' || v === 'week') && setView(v)}
           views={['month', 'week']}
           style={{ height: 500, fontFamily: theme.font.family, fontSize: 12 }}
