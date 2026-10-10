@@ -137,9 +137,10 @@ const FACT_ICON: [RegExp, React.ElementType][] = [
 ];
 
 /** Why a ticket is at risk, drawn rather than listed: odds, hours needed vs available, the facts as tiles, and the next step. */
-export function RiskBreakdown({ cause, pMiss, explanation, facts, action, needed, low, high, available, deadline, finish }: {
+export function RiskBreakdown({ cause, pMiss, explanation, facts, action, needed, low, high, available, deadline, finish, confidence }: {
   cause: string; pMiss: number; explanation: string; facts: string[]; action?: string | null;
   needed?: number; low?: number; high?: number; available?: number; deadline?: string; finish?: string | null;
+  confidence?: { level: 'High' | 'Medium' | 'Low'; reason: string };
 }) {
   const c = pMiss >= 0.5 ? theme.colors.red : pMiss >= 0.3 ? theme.colors.sand : theme.colors.sage;
   const rest = facts.filter(f => f && !/^Needs \d/.test(f));
@@ -157,6 +158,12 @@ export function RiskBreakdown({ cause, pMiss, explanation, facts, action, needed
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: c, textTransform: 'uppercase', letterSpacing: 0.4 }}>{cause || 'Deadline risk'}</div>
           <div style={{ fontSize: 13, lineHeight: 1.5, marginTop: 2 }}>{explanation}</div>
+          {confidence && (
+            <div style={{ fontSize: 12, color: theme.colors.grey, marginTop: 6, lineHeight: 1.45 }}>
+              <Pill color={confidence.level === 'High' ? theme.colors.sage : confidence.level === 'Medium' ? theme.colors.sand : theme.colors.red}>
+                {confidence.level} confidence</Pill>{' '}{confidence.reason}
+            </div>
+          )}
         </div>
       </div>
 
@@ -333,7 +340,7 @@ export function RiskActionModal({ risk, defaultReason, onClose }: { risk: RiskIt
         </div>
         <RiskBreakdown cause={risk.cause} pMiss={risk.p_miss} explanation={risk.explanation} facts={risk.facts} action={risk.action}
           needed={risk.hours_needed} low={risk.hours_low} high={risk.hours_high} available={risk.hours_available}
-          deadline={risk.deadline} finish={risk.expected_completion} />
+          deadline={risk.deadline} finish={risk.expected_completion} confidence={risk.confidence} />
 
         <div style={{ display: 'flex', gap: 6 }}>
           {(['reassign', 'support'] as const).map(m => (

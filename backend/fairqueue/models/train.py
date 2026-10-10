@@ -46,17 +46,18 @@ def fit_empirical(d: pd.DataFrame) -> dict:
     expected = base * d["priority"].map(pri).fillna(1.0)
     log_ratio = np.log(hours / expected)
     effects = {}
-    for (a, c), lr in log_ratio.groupby([d["assignee"], d["category"]]):
+    for (a, c), lr in log_ratio.dropna().groupby([d["assignee"], d["category"]]):
         effects[f"{a}|{c}"] = float(np.exp(lr.sum() / (len(lr) + SHRINK)))
     emp = {"cat_median": cat_med.to_dict(), "priority_ratio": pri.to_dict(),
            "overall_median": float(hours.median()), "effects": effects}
     # Range: 10th / 90th percentile of what's left after the analyst effect
     resid = np.log(hours / (expected * pd.Series([analyst_effect(emp, a, c) for a, c in zip(d["assignee"], d["category"])], index=d.index)))
-    emp["band"] = (float(np.exp(np.quantile(resid, 0.1))), float(np.exp(np.quantile(resid, 0.9))))
+    emp["band"] = (float(np.exp(np.nanquantile(resid, 0.1))), float(np.exp(np.nanquantile(resid, 0.9))))
     return emp
 
 
 def empirical_likely(emp: dict, categories, priorities) -> np.ndarray:
+    # Unknown or missing category / priority fall back to the overall median / no adjustment
     return np.array([emp["cat_median"].get(c, emp["overall_median"]) * emp["priority_ratio"].get(p, 1.0)
                      for c, p in zip(categories, priorities)])
 
@@ -66,6 +67,57 @@ def analyst_effect(emp: dict | None, analyst: str | None, category: str) -> floa
     if not emp or not analyst:
         return 1.0
     return float(emp["effects"].get(f"{analyst}|{category}", 1.0))
+
+
+def _robustness(train, test, method, fit_lgb, predict_lgb, predict_emp, with_analyst) -> list[dict]:
+    """Re-score the hours model with damaged data. Training damage is refitted from scratch;
+    test damage only changes what the model is given, and is always scored on true hours."""
+    rng = np.random.default_rng(42)
+    yte = test["actual_hours"].astype(float).values
+
+    def score(tr, te):
+        emp = fit_empirical(tr)
+        base = te["category"].map(tr.groupby("category")["actual_hours"].median()).fillna(tr["actual_hours"].median()).values
+        pred = predict_emp(emp, te) if method == "empirical" else predict_lgb(fit_lgb(tr), te)
+        model = with_analyst(emp, te, pred)["likely"]
+        return round(float(np.mean(np.abs(model - yte))), 2), round(float(np.mean(np.abs(base - yte))), 2)
+
+    def damaged_train(fn):
+        d = train.copy()
+        fn(d)
+        return d
+
+    def damaged_test(fn):
+        d = test.copy()
+        fn(d)
+        return d
+
+    def outliers(d):                       # 5% of logged hours wildly wrong (x5 or x0.2)
+        i = rng.choice(len(d), max(1, len(d) // 20), replace=False)
+        d.iloc[i, d.columns.get_loc("actual_hours")] *= rng.choice([5.0, 0.2], len(i))
+
+    def noise(d):                          # every logged hour off by about ±30%
+        d["actual_hours"] = d["actual_hours"] * rng.lognormal(0, 0.3, len(d))
+
+    def wrong_category(d):                 # 10% of tickets filed under the wrong type
+        i = rng.choice(len(d), max(1, len(d) // 10), replace=False)
+        d.iloc[i, d.columns.get_loc("category")] = rng.choice(sorted(d["category"].unique()), len(i))
+
+    def missing_fields(d):                 # 20% of new tickets arrive without priority or department
+        for col in ("priority", "division"):
+            i = rng.choice(len(d), max(1, len(d) // 5), replace=False)
+            d.iloc[i, d.columns.get_loc(col)] = None
+
+    cases = [("Clean data", train, test),
+             ("5% outliers in logged hours", damaged_train(outliers), test),
+             ("±30% noise on every logged hour", damaged_train(noise), test),
+             ("10% of tickets under the wrong type", damaged_train(wrong_category), test),
+             ("20% of new tickets missing priority or department", train, damaged_test(missing_fields))]
+    out = []
+    for name, tr, te in cases:
+        m, b = score(tr, te)
+        out.append({"case": name, "mae_model": m, "mae_baseline": b, "beats_baseline": m < b})
+    return out
 
 
 def experience_before(df: pd.DataFrame) -> pd.Series:
@@ -181,6 +233,8 @@ def train_all(extra_closed: pd.DataFrame | None = None) -> dict:
     brier_model = brier(p_h, yte_h)
     brier_base = brier(np.full(len(yte_h), base_rate), yte_h)
 
+    robustness = _robustness(train, test, method, fit_lgb, predict_lgb, predict_emp, with_analyst)
+
     ARTIFACTS_DIR.mkdir(exist_ok=True)
     with open(ARTIFACTS_DIR / "hours_model.pkl", "wb") as f:
         pickle.dump({"models": hours_models, "categories": categories,
@@ -201,6 +255,7 @@ def train_all(extra_closed: pd.DataFrame | None = None) -> dict:
             "method": method, "validation_mae": {k: round(v, 2) for k, v in val_scores.items()},
             "test_mae": comparison,
         },
+        "robustness": robustness,
         "handover": {
             "brier_model": round(brier_model, 4), "brier_base_rate": round(brier_base, 4),
             "beats_baseline": brier_model < brier_base, "base_rate": round(base_rate, 3),

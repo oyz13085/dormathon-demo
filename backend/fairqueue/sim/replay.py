@@ -189,6 +189,8 @@ class Sim:
         return {"ticket_id": r.ticket_id, "division": r.division, "category": r.category,
                 "analyst": a, "hours": hours, "week": now.isocalendar()[:2],
                 "finish": finish, "deadline": r.deadline, "missed": finish > r.deadline,
+                "days_late": max((finish - r.deadline).total_seconds() / 86400, 0.0),
+                "handover_hours": ho * HANDOVER_BUFFER_HOURS,
                 "handover": ho, "alert": p >= ALERT_THRESHOLD, "p_miss": p,
                 "cause_ok": _cause_check(r, backlog, avail, low, likely, high)}
 
@@ -223,6 +225,8 @@ def _summary(rows, n_days):
         "alert_recall": round(recall, 2),
         "alerts_per_day": round(len(alerts) / max(n_days, 1), 2),
         "cause_label_accuracy": round(cause_acc, 2),
+        "days_late": round(float(df["days_late"].sum()), 1),
+        "handover_hours": round(float(df["handover_hours"].sum()), 1),
         "by_department": {d: int(g["missed"].sum()) for d, g in df.groupby("division")},
     }
 
@@ -302,6 +306,21 @@ def run_replay() -> dict:
         results[policy] = averaged(policy)
     results["fairqueue_conservative"] = averaged("fairqueue", conservative=True)
 
+    # Alert threshold: how precision, recall and alert volume move with it, on the real assignments
+    actual_rows = sim(focus, spread, 0).run("actual", test, handover_model)
+    sweep = []
+    for th in np.arange(0.3, 0.851, 0.05):
+        fired = [o for o in actual_rows if o["p_miss"] >= th]
+        missed = [o for o in actual_rows if o["missed"]]
+        prec = float(sum(o["missed"] for o in fired) / len(fired)) if fired else None
+        rec = float(sum(o["p_miss"] >= th for o in missed) / len(missed)) if missed else None
+        sweep.append({"threshold": round(float(th), 2), "precision": None if prec is None else round(prec, 2),
+                      "recall": None if rec is None else round(rec, 2), "alerts_per_day": round(len(fired) / max(n_days, 1), 2)})
+    # Suggest the lowest threshold whose alerts are right at least 85% of the time: few false alarms,
+    # and as many real misses caught as that allows
+    ok = [x for x in sweep if x["precision"] is not None and x["precision"] >= 0.85]
+    suggested = ok[0]["threshold"] if ok else max(sweep, key=lambda x: x["precision"] or 0)["threshold"]
+
     # Validity checks
     real_missed = int((test["closed_at"] > test["deadline"]).sum())
     real_handovers = round(100 * float((test["handovers"] > 0).mean()), 1)
@@ -327,12 +346,17 @@ def run_replay() -> dict:
         "weights": weights,
         "assumptions": [
             "Deadlines are service targets: 1.5 × the median duration for each priority.",
-            f"Analysts average {focus:g} focused hours a working day, varying by about ±{spread:g}h day to day "
-            f"(both calibrated on the training period only). Results are the mean of {RUNS} runs.",
+            (f"Analysts average {focus:g} focused hours a working day, varying by about ±{spread:g}h day to day "
+             f"(both calibrated on the training period only). Results are the mean of {RUNS} runs."
+             if spread > 0 else
+             f"Analysts work {focus:g} focused hours a working day (calibrated on the training period only; "
+             f"adding day-to-day variation did not fit the history better)."),
             "A ticket given to a different analyst costs that analyst's measured effort on the category.",
             f"Each expected handover adds {HANDOVER_BUFFER_HOURS:g}h of work and {wait_days:g} day(s) of waiting (calibrated).",
         ],
         "policies": results,
+        "alert_threshold": {"current": ALERT_THRESHOLD, "suggested": suggested, "sweep": sweep,
+                            "rule": "lowest threshold where at least 85% of alerts are real misses"},
         "checks": {
             "simulator": {"real_missed": real_missed,
                           "simulated_missed": results["actual"]["missed_deadlines"],
@@ -347,4 +371,5 @@ def run_replay() -> dict:
         },
         "hours_model": model_report["hours"] if model_report else None,
         "handover_model": model_report["handover"] if model_report else None,
+        "robustness": model_report.get("robustness") if model_report else None,
     }

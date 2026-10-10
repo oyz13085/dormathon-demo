@@ -104,6 +104,29 @@ def label(t: dict, s: Slot, ctx: dict) -> tuple[str, str, list[str]]:
             [est, ahead, queue])
 
 
+def confidence(t: dict, s: Slot, past_in_category: int) -> dict:
+    """How sure FairQueue is about this alert, in plain words."""
+    width = s.high / max(s.low, 0.5)
+    margin = abs(s.p_miss - ALERT_THRESHOLD)
+    reasons = []
+    if t.get("confidence") == "Low":
+        reasons.append("this ticket type is new, so the hours are a wide guess")
+    elif width > 3:
+        reasons.append(f"the hours could be anywhere from {s.low:g}h to {s.high:g}h")
+    else:
+        reasons.append(f"the hours estimate is tight ({s.low:g}–{s.high:g}h)")
+    reasons.append(f"{past_in_category} similar ticket{'s' if past_in_category != 1 else ''} in the history")
+    if margin < 0.1:
+        reasons.append("the chance of missing is close to the alert line")
+    if t.get("confidence") == "Low" or width > 4 or past_in_category < 3:
+        level = "Low"
+    elif width <= 3 and margin >= 0.2 and past_in_category >= 10:
+        level = "High"
+    else:
+        level = "Medium"
+    return {"level": level, "reason": "; ".join(reasons).capitalize() + "."}
+
+
 def score_all(extra_leave: dict | None = None) -> list[dict]:
     slots = schedule.full_schedule(extra_leave)
     ctx = _context()
@@ -114,6 +137,7 @@ def score_all(extra_leave: dict | None = None) -> list[dict]:
         s = slots[t["id"]]
         cause, sentence, facts = label(t, s, ctx)
         impact = business_impact(t)
+        n_similar = sum(len(v) for (a, c), v in ctx["stats"][0].items() if c == t.get("category"))
         out.append({
             "ticket_id": t["id"], "ticket_title": t["title"], "division": t["division"],
             "priority": t["priority"], "status": t["status"], "deadline": t["deadline"],
@@ -124,6 +148,7 @@ def score_all(extra_leave: dict | None = None) -> list[dict]:
             "hours_needed": s.likely, "hours_low": s.low, "hours_high": s.high, "hours_available": round(s.available, 1),
             "expected_completion": s.finish.isoformat() if s.finish else None,
             "alert": s.p_miss >= ALERT_THRESHOLD,
+            "confidence": confidence(t, s, n_similar),
         })
     return out
 
