@@ -110,7 +110,7 @@ def score(analyst: dict, ticket: dict, weights: dict, stats=None, team_avg_hours
 
     from fairqueue.models.handover import predict_handover
     p_h = predict_handover(category, ticket.get("priority") or "Medium",
-                           ticket.get("division") or "IT", len(past))
+                           ticket.get("division") or "IT", len(past), analyst["name"])
 
     c = Candidate(analyst_id=aid, name=analyst["name"], fit=round(fit), breakdown=bd,
                   past_in_category=len(past), past_with_requester=together,

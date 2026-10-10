@@ -158,7 +158,7 @@ class Sim:
             scored[a][0], scored[a][0] - scored[a][1], self.p_miss_for(a, r, now), a == partner))
 
     def p_miss_for(self, a, r, now):
-        low, likely, high = self.predict(r)
+        low, likely, high = self.predict(r, a)
         avail = max(work_hours_between(now, r.deadline, self.focus) - self.backlog(a, now), 0)
         return p_miss(avail, low, likely, high)
 
@@ -177,7 +177,7 @@ class Sim:
         if a != r.assignee:
             base = hours - (HANDOVER_BUFFER_HOURS if r.handovers else 0)
             base *= self.eff.get((a, r.category), 1.0) / self.eff.get((r.assignee, r.category), 1.0)
-            ho = handover_model(r, self.exp[(a, r.category)]) if handover_model else 0.0
+            ho = handover_model(r, self.exp[(a, r.category)], a) if handover_model else 0.0
             hours = base + ho * HANDOVER_BUFFER_HOURS
         start = max(self.free_at[a] or now, now)
         finish = add_work(start, max(hours, 0.25), lambda d: day_focus(self.focus, self.spread, self.seed, a, d), self.used[a])
@@ -248,15 +248,16 @@ def run_replay() -> dict:
     from fairqueue.models.handover import predict_handover
     cache: dict = {}
 
-    def predict(r):
-        key = (r.category, r.priority, r.division)
+    def predict(r, analyst=None):
+        """Hours for a ticket; with an analyst, adjusted for their measured speed on the type."""
+        key = (r.category, r.priority, r.division, analyst)
         if key not in cache:
-            p = predict_hours(r.category, r.priority, r.division, str(r.created_at))
+            p = predict_hours(r.category, r.priority, r.division, str(r.created_at), analyst)
             cache[key] = (p["low"], p["likely"], p["high"])
         return cache[key]
 
-    def handover_model(r, experience):
-        return predict_handover(r.category, r.priority, r.division, experience)
+    def handover_model(r, experience, analyst=None):
+        return predict_handover(r.category, r.priority, r.division, experience, analyst)
 
     weights = _settings()
 
