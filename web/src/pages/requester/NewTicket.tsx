@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Send, Sparkles } from 'lucide-react';
+import { FilePlus2, Send, Sparkles } from 'lucide-react';
 import { theme } from '../../theme';
 import { api } from '../../api/client';
 import type { Dept, Priority, Suggestion, Ticket } from '../../api/types';
 import { useSession } from '../../session';
-import { Button, Card, Field, Grid, Modal, Notice, PRIORITY_COLOR, card, fmtDate, inputStyle } from '../../components/ui';
+import { Button, Card, Field, Hint, Modal, Notice, PRIORITY_COLOR, Pill, fmtDate, inputStyle } from '../../components/ui';
 
 const PRIORITIES: Priority[] = ['Low', 'Medium', 'High', 'Critical'];
 
@@ -64,7 +64,6 @@ export default function NewTicket() {
   const rec = suggestion?.recommendation;
   const canAutoAssign = !!rec?.recommended && suggestion?.confidence === 'High';
   const deptPredicted = !!suggestion && !deptTouched && !!division;
-  const priorityPredicted = !!suggestion && !priorityTouched && !!priority;
 
   async function submit() {
     if (!title.trim() || !division || !deadline || !priority) { setError('Fill in the title, department, deadline and priority.'); return; }
@@ -86,12 +85,9 @@ export default function NewTicket() {
   const myTicketsPath = role === 'analyst' ? '/analyst/requested' : '/requester/tickets';
 
   return (
-    <Grid cols="minmax(0,1fr) 360px">
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: theme.colors.ink, flex: 1 }}>New request</h2>
-        </div>
-        <Card>
+    <div className="fq-split" style={{ ['--side' as string]: '400px' }}>
+      <Card title="New request" icon={FilePlus2} iconColor={theme.colors.accent}
+        right={<Hint>Suggestions fill in as you type</Hint>}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {created && (
             <Notice tone="ok">
@@ -103,7 +99,7 @@ export default function NewTicket() {
           <Field label="Title">
             <input value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Monthly payroll variance report" style={inputStyle} />
           </Field>
-          <Grid cols="1fr 1fr">
+          <div className="fq-cards-fit" style={{ ['--min' as string]: '200px', gap: 16 }}>
             <Field label="Requesting department" hint={deptPredicted ? 'Predicted — change it if wrong' : undefined}>
               <select value={division} onChange={e => { setDivision(e.target.value as Dept); setDeptTouched(true); }}
                 style={predictedStyle(deptPredicted)}>
@@ -114,121 +110,115 @@ export default function NewTicket() {
             <Field label="Deadline">
               <input type="date" value={deadline} onChange={e => setDeadline(e.target.value)} style={inputStyle} />
             </Field>
-          </Grid>
+          </div>
           <Field label="Description" hint="What do you need, which data, and what will you do with the answer?">
             <textarea value={description} onChange={e => setDescription(e.target.value)} rows={5}
               style={{ ...inputStyle, resize: 'vertical' }} />
           </Field>
-          <Field label="Priority" hint={suggestion ? `Suggested: ${suggestion.priority}. You can change it; the team lead has the final say.` : 'Filled in from the suggestion'}>
-            <select value={priority} onChange={e => { setPriority(e.target.value as Priority); setPriorityTouched(true); }}
-              style={predictedStyle(priorityPredicted)}>
-              <option value="">Select…</option>
-              {PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
-            </select>
-          </Field>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <span style={{ fontSize: 12, fontWeight: 600, color: theme.colors.grey }}>Priority</span>
+            <div role="radiogroup" aria-label="Priority" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 6 }}>
+              {PRIORITIES.map(p => {
+                const on = priority === p;
+                const suggested = suggestion?.priority === p;
+                return (
+                  <button key={p} role="radio" aria-checked={on} onClick={() => { setPriority(p); setPriorityTouched(true); }} style={{
+                    padding: '9px 4px', borderRadius: 12, cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
+                    border: `1.5px solid ${on ? PRIORITY_COLOR[p] : suggested ? PRIORITY_COLOR[p] + '80' : theme.colors.track}`,
+                    background: on ? PRIORITY_COLOR[p] : theme.colors.card, color: on ? '#fff' : theme.colors.ink,
+                  }}>{p}{suggested && <Sparkles size={11} style={{ marginLeft: 4, verticalAlign: -1 }} />}</button>
+                );
+              })}
+            </div>
+            <span style={{ fontSize: 11, color: theme.colors.grey }}>
+              {suggestion ? `Suggested: ${suggestion.priority} (marked ✦). You can change it; the team lead has the final say.` : 'Filled in from the suggestion once you add a title'}
+            </span>
+          </div>
           {canAutoAssign && (
             <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13 }}>
               <input type="checkbox" checked={assignToSuggested} onChange={e => setAssignToSuggested(e.target.checked)}
-                style={{ accentColor: '#2563EB', width: 15, height: 15 }} />
+                style={{ accentColor: theme.colors.ink, width: 15, height: 15 }} />
               Assign to {rec!.recommended!.name} straight away
             </label>
           )}
           {error && <Notice tone="error">{error}</Notice>}
           <div><Button onClick={submit}><Send size={14} /> Submit request</Button></div>
         </div>
-        </Card>
-      </div>
+      </Card>
 
-      <div className="rq-tiles" style={{ display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0, alignSelf: 'stretch', height: '100%' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ width: 24, height: 24, borderRadius: 7, background: theme.colors.accent + '20',
-            display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Sparkles size={13} color={theme.colors.accent} strokeWidth={1.5} />
-          </span>
-          <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: theme.colors.ink, flex: 1 }}>Reasoning</h2>
-          {!thinking && suggestion?.priority_method === 'llm' && (
-            <span style={{ fontSize: 11, color: theme.colors.grey }}>{meta?.llm.model}</span>
+      <Card title="AI suggestions" icon={Sparkles} iconColor={theme.colors.accent}
+        right={!thinking && suggestion && <Pill color={suggestion.priority_method === 'llm' ? theme.colors.sage : theme.colors.grey}>
+          {suggestion.priority_method === 'llm' ? meta?.llm.model ?? 'AI' : 'rule-based'}</Pill>}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {thinking && <div className="fq-loadbar" role="status" aria-label="Reasoning in progress"><div /></div>}
+          {!suggestion && (
+            <p style={{ margin: 0, fontSize: 13, color: theme.colors.grey, lineHeight: 1.6 }}>
+              {thinking ? 'Reading your request…' : 'Fill in the title, department and deadline to see the suggested priority, effort and analyst, with the reason for each.'}
+            </p>
+          )}
+          {suggestion && (
+            <>
+              <Tile>
+                <TileLabel>Priority</TileLabel>
+                <p style={{ margin: 0, fontSize: 19, fontWeight: 800, color: PRIORITY_COLOR[suggestion.priority] }}>{suggestion.priority}</p>
+                <p style={{ margin: '8px 0 0', fontSize: 13, lineHeight: 1.6, color: theme.colors.ink }}>{cleanReason(suggestion.priority_reason)}</p>
+              </Tile>
+              <Tile>
+                <TileLabel>Estimated effort</TileLabel>
+                <p style={{ margin: 0, fontSize: 26, fontWeight: 800, color: theme.colors.ink }}>
+                  {suggestion.hours.likely}h
+                  <span style={{ fontSize: 12, fontWeight: 500, color: theme.colors.grey }}>
+                    {' '}range {suggestion.hours.low}–{suggestion.hours.high}h{suggestion.category ? ` · ${suggestion.category}` : ''}
+                  </span>
+                </p>
+              </Tile>
+              {rec?.recommended ? (
+                <MatchTile name={rec.recommended.name} fit={rec.recommended.fit}
+                  explanation={rec.recommended.explanation}
+                  breakdown={rec.recommended.breakdown} free={rec.recommended.free_hours ?? 0}
+                  open={rec.recommended.open_hours ?? 0}
+                  pastCat={rec.recommended.past_in_category ?? 0} pastReq={rec.recommended.past_with_requester ?? 0}
+                  category={suggestion.category} user={user} />
+              ) : rec?.decision === 'low_confidence' ? (
+                <Tile>
+                  <TileLabel>Assignee</TileLabel>
+                  <Notice tone="warn">This looks like a new type of request, so FairQueue won't guess. The team lead will pick an analyst.</Notice>
+                </Tile>
+              ) : undefined}
+              {rec?.decision === 'poor' && rec.usual_partner && (
+                <Tile>
+                  <TileLabel>Usual partner</TileLabel>
+                  <p style={{ margin: 0, fontSize: 13 }}>
+                    <strong>{rec.usual_partner.name}</strong>
+                    <span style={{ color: theme.colors.grey }}> — {rec.usual_partner.explanation}</span>
+                  </p>
+                </Tile>
+              )}
+              {rec?.note && <Tile><p style={{ margin: 0, fontSize: 13, color: theme.colors.ink }}>{rec.note}</p></Tile>}
+              {suggestion.similar_work.length > 0 && (
+                <Tile>
+                  <TileLabel>Already answered?</TileLabel>
+                  {suggestion.similar_work.map(w => (
+                    <p key={w.deliverable_id} style={{ margin: '0 0 8px', fontSize: 13, lineHeight: 1.6 }}>
+                      <a href={api.fileUrl(w.deliverable_id)} target="_blank" rel="noreferrer" style={{ fontWeight: 600, color: theme.colors.ink }}>
+                        {w.title}
+                      </a>
+                      <span style={{ color: theme.colors.grey }}>, delivered {fmtDate(w.delivered_on)}</span>
+                    </p>
+                  ))}
+                </Tile>
+              )}
+            </>
           )}
         </div>
-        {thinking && <div className="fq-loadbar" role="status" aria-label="Reasoning in progress"><div /></div>}
-
-        {thinking && !suggestion && (
-          <Card style={{ padding: 16 }}>
-            <p style={{ margin: 0, fontSize: 13, color: theme.colors.grey }}>Reading your request…</p>
-          </Card>
-        )}
-        {!thinking && !suggestion && (
-          <Card style={{ padding: 16 }}>
-            <p style={{ margin: 0, fontSize: 13, color: theme.colors.grey }}>
-              Fill in the title, department and deadline to see why a priority, department and assignee are suggested.
-            </p>
-          </Card>
-        )}
-        {suggestion && (
-          <>
-            <Card style={{ padding: '22px 24px' }}>
-              <TileLabel>Priority</TileLabel>
-              <p style={{ margin: 0, fontSize: 19, fontWeight: 800, color: PRIORITY_COLOR[suggestion.priority] }}>
-                {suggestion.priority}
-              </p>
-              <p style={{ margin: '10px 0 0', fontSize: 14, lineHeight: 1.65, color: theme.colors.ink }}>
-                {cleanReason(suggestion.priority_reason)}
-              </p>
-            </Card>
-            <Card style={{ padding: '22px 24px' }}>
-              <TileLabel>Estimated effort</TileLabel>
-              <p style={{ margin: 0, fontSize: 28, fontWeight: 800, color: theme.colors.ink }}>
-                {suggestion.hours.likely}h
-                <span style={{ fontSize: 13, fontWeight: 500, color: theme.colors.grey }}>
-                  {' '}range {suggestion.hours.low}–{suggestion.hours.high}h{suggestion.category ? ` · ${suggestion.category}` : ''}
-                </span>
-              </p>
-            </Card>
-            {rec?.recommended ? (
-              <MatchTile name={rec.recommended.name} fit={rec.recommended.fit}
-                explanation={rec.recommended.explanation}
-                breakdown={rec.recommended.breakdown} free={rec.recommended.free_hours ?? 0}
-                open={rec.recommended.open_hours ?? 0}
-                pastCat={rec.recommended.past_in_category ?? 0} pastReq={rec.recommended.past_with_requester ?? 0}
-                category={suggestion.category} user={user} />
-            ) : rec?.decision === 'low_confidence' ? (
-              <Card style={{ padding: 16 }}>
-                <TileLabel>Assignee</TileLabel>
-                <Notice tone="warn">This looks like a new type of request, so FairQueue won't guess. The team lead will pick an analyst.</Notice>
-              </Card>
-            ) : undefined}
-            {rec?.decision === 'poor' && rec.usual_partner && (
-              <Card style={{ padding: 16 }}>
-                <TileLabel>Usual partner</TileLabel>
-                <p style={{ margin: 0, fontSize: 13 }}>
-                  <strong>{rec.usual_partner.name}</strong>
-                  <span style={{ color: theme.colors.grey }}> — {rec.usual_partner.explanation}</span>
-                </p>
-              </Card>
-            )}
-            {rec?.note && (
-              <Card style={{ padding: 16 }}>
-                <p style={{ margin: 0, fontSize: 13, color: theme.colors.ink }}>{rec.note}</p>
-              </Card>
-            )}
-            {suggestion.similar_work.length > 0 && (
-              <Card style={{ padding: '22px 24px' }}>
-                <TileLabel>Already answered?</TileLabel>
-                {suggestion.similar_work.map(w => (
-                  <p key={w.deliverable_id} style={{ margin: '0 0 12px', fontSize: 14, lineHeight: 1.6 }}>
-                    <a href={api.fileUrl(w.deliverable_id)} target="_blank" rel="noreferrer" style={{ fontWeight: 600, color: theme.colors.ink }}>
-                      {w.title}
-                    </a>
-                    <span style={{ color: theme.colors.grey }}>, delivered {fmtDate(w.delivered_on)}</span>
-                  </p>
-                ))}
-              </Card>
-            )}
-          </>
-        )}
-      </div>
-    </Grid>
+      </Card>
+    </div>
   );
+}
+
+/** A grey section inside the suggestions card. */
+function Tile({ children }: { children: React.ReactNode }) {
+  return <div style={{ padding: '14px 16px', borderRadius: 14, background: theme.colors.background }}>{children}</div>;
 }
 
 function TileLabel({ children }: { children: React.ReactNode }) {
@@ -260,11 +250,10 @@ function MatchTile({ name, fit, explanation, breakdown, free, open, pastCat, pas
   const total = Math.round(free + open);
   return (
     <>
-      <article onClick={() => setShow(true)} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
-        style={{ ...card, padding: '22px 24px', cursor: 'pointer',
+      <article onClick={() => setShow(true)} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)} className="fq-lift"
+        style={{ padding: '14px 16px', borderRadius: 14, cursor: 'pointer',
           background: theme.colors.accent + '14',
           border: `1.5px solid ${hover ? theme.colors.accent : 'transparent'}`,
-          boxShadow: hover ? theme.shadow : theme.shadow,
           transition: 'border-color 0.15s' }}>
         <TileLabel>Best match</TileLabel>
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>

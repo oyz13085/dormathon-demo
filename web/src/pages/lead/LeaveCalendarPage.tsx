@@ -1,17 +1,24 @@
 import { useState } from 'react';
-import { Check, X, CalendarDays, Users, FlaskConical } from 'lucide-react';
+import { AlertCircle, Check, CheckCircle, X, CalendarDays, Hourglass, Plane, Users, FlaskConical } from 'lucide-react';
 import { theme } from '../../theme';
 import { api, qs } from '../../api/client';
 import type { Leave, Meta, RiskItem, WhatIf } from '../../api/types';
 import { useApi, useSession } from '../../session';
 import { LeaveCalendar, ANALYST_COLORS, type LeaveEvent } from '../../components/LeaveCalendar';
 import { RiskActionModal } from '../../components/TicketModals';
-import { Button, Card, Empty, Field, Grid, Loading, Notice, Pill, RiskBadge, Table, fmtDate, initials, inputStyle, td } from '../../components/ui';
+import { Button, Card, Empty, Field, Grid, Hint, Loading, Notice, Page, Pill, RiskBadge, StatRow, StatTile, Table, fmtDate, initials, inputStyle, td } from '../../components/ui';
 
 type Broken = WhatIf['broken'][number];
 interface Reassigning { risk: RiskItem; reason: string }
 
 const today = () => new Date().toISOString().slice(0, 10);
+const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+function weekBounds(): [string, string] {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - ((now.getDay() + 6) % 7));
+  const end = new Date(start); end.setDate(start.getDate() + 7);
+  return [iso(start), iso(end)];
+}
 const pct = (p: number | null) => p == null ? '—' : `${Math.round(p * 100)}%`;
 
 function toEvent(l: Leave): LeaveEvent {
@@ -96,6 +103,8 @@ export default function LeaveCalendarPage() {
   const upcoming = all.filter(l => l.status === 'Approved' && l.end_date >= today());
   const past = all.filter(l => l.status === 'Rejected' || (l.status === 'Approved' && l.end_date < today()));
   const needCover = [...pending, ...upcoming].reduce((n, l) => n + (l.whatif?.broken.length ?? 0), 0);
+  const [ws, we] = weekBounds();
+  const awayNow = [...new Set(all.filter(l => l.status === 'Approved' && l.start_date < we && l.end_date >= ws).map(l => l.analyst_name))];
 
   async function decide(l: Leave, status: 'Approved' | 'Rejected') {
     await api.patch(`/planning/leave/${l.id}`, { status });
@@ -122,16 +131,22 @@ export default function LeaveCalendarPage() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: theme.space.gap }}>
+    <Page>
       {/* Calendar first */}
       <Card title="Team leave calendar" icon={CalendarDays} iconColor={theme.colors.accent}
-        right={leave.data && (
-          <span style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            <Pill color={theme.colors.sand}>{pending.length} pending</Pill>
-            <Pill color={theme.colors.sage}>{upcoming.length} approved upcoming</Pill>
-            <Pill color={needCover ? theme.colors.red : theme.colors.sage}>{needCover} ticket{needCover === 1 ? '' : 's'} need cover</Pill>
-          </span>
-        )}>
+        right={<Hint>Approve leave and cover its tickets in one place</Hint>}>
+        {leave.data && (
+          <div style={{ marginBottom: 16 }}>
+            <StatRow>
+              <StatTile icon={Hourglass} color={theme.colors.sand} label="Pending requests" value={pending.length} hint="waiting for your decision" />
+              <StatTile icon={CheckCircle} color={theme.colors.sage} label="Approved, upcoming" value={upcoming.length} hint="leave not over yet" />
+              <StatTile icon={AlertCircle} color={needCover ? theme.colors.red : theme.colors.sage} label="Tickets need cover" value={needCover}
+                hint={needCover ? 'would miss the deadline' : 'everything covered'} />
+              <StatTile icon={Plane} color={theme.colors.accent} label="Away this week" value={awayNow.length}
+                hint={awayNow.length ? awayNow.join(', ') : 'whole team in'} />
+            </StatRow>
+          </div>
+        )}
         {leave.data ? (
           <LeaveCalendar events={all.filter(l => l.status !== 'Rejected').map(toEvent)} onSelectEvent={e => jumpTo(e.id)} />
         ) : <Loading error={leave.error} />}
@@ -169,7 +184,7 @@ export default function LeaveCalendarPage() {
       {reassigning && (
         <RiskActionModal risk={reassigning.risk} defaultReason={reassigning.reason} onClose={() => setReassigning(null)} />
       )}
-    </div>
+    </Page>
   );
 }
 

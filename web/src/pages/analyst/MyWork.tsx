@@ -3,8 +3,8 @@ import { theme } from '../../theme';
 import { api, qs } from '../../api/client';
 import type { Deliverable, Feedback, SkillAdjustment } from '../../api/types';
 import { useApi, useSession } from '../../session';
-import { Paperclip } from 'lucide-react';
-import { Button, Card, Empty, Field, Grid, Loading, Modal, Notice, Pill, Table, fmtDate, inputStyle, td } from '../../components/ui';
+import { Briefcase, GraduationCap, PackageCheck, Paperclip, RotateCcw, ThumbsUp, Timer } from 'lucide-react';
+import { Button, Card, Empty, Field, Hint, Loading, Modal, Notice, Page, Pill, StatRow, StatTile, fmtDate, inputStyle } from '../../components/ui';
 import { RevisionDetailsModal } from '../../components/RevisionDetailsModal';
 
 export default function MyWork() {
@@ -26,61 +26,89 @@ export default function MyWork() {
     } catch (e) { setMsg((e as Error).message); }
   }
 
+  const delivered = work.data ?? [];
+  const useful = delivered.filter(d => d.requester_rating === 'Useful').length;
+  const revise = delivered.filter(d => d.requester_rating === 'Needs revision').length;
+  const timed = (feedback.data ?? []).filter(f => f.pred_likely && f.actual_hours);
+  const onEstimate = timed.filter(f => Math.abs(f.actual_hours! - f.pred_likely!) <= 0.25 * f.pred_likely!).length;
+  const pendingFlags = (flags.data ?? []).filter(f => !f.approved).length;
+
   return (
-    <Grid cols="minmax(0,1fr) 380px">
-      <Card title="My completed work" right={<span style={{ fontSize: 12, color: theme.colors.grey }}>Useful for reviews and for handing over before leave</span>}
-        style={{ alignSelf: 'stretch', height: '100%' }}>
-        {!work.data ? <Loading error={work.error} /> : work.data.length === 0 ? <Empty>Nothing delivered yet.</Empty> : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 300px), 1fr))', gap: 12 }}>
-            {work.data.map(d => (
-              <WorkTile key={d.id} d={d} onViewRevision={() => setRevisionFor(d)}
-                actualHours={(feedback.data ?? []).find(f => f.ticket_id === d.ticket_id)?.actual_hours} />
-            ))}
-          </div>
+    <Page>
+      <Card title="My work & feedback" icon={Briefcase} iconColor={theme.colors.accent}
+        right={<Hint>Useful for reviews and for handing over before leave</Hint>}>
+        {!work.data ? <Loading error={work.error} /> : (
+          <StatRow>
+            <StatTile icon={PackageCheck} color={theme.colors.ink} label="Delivered" value={delivered.length} hint="closed with a hand-back" />
+            <StatTile icon={ThumbsUp} color={theme.colors.sage} label="Rated useful" value={useful} hint="by the requester" />
+            <StatTile icon={RotateCcw} color={theme.colors.red} label="Needs revision" value={revise} hint={revise ? 'open a tile for the note' : 'nothing to redo'} />
+            <StatTile icon={Timer} color={theme.colors.accent} label="On estimate" value={timed.length ? `${Math.round((100 * onEstimate) / timed.length)}%` : '—'}
+              hint="closed within ±25% of the estimate" />
+            <StatTile icon={GraduationCap} color={theme.colors.sand} label="Skill flags" value={pendingFlags} hint="waiting for the lead" />
+          </StatRow>
         )}
       </Card>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: theme.space.gap }}>
-        <Card title="My feedback on estimates">
-          {!feedback.data ? <Loading error={feedback.error} /> : feedback.data.length === 0 ? <Empty>No feedback yet.</Empty> : (
-            <Table head={['Ticket', 'Estimate', 'Actual', 'Rating']}>
-              {feedback.data.map(f => (
-                <tr key={f.id}>
-                  <td style={td}>{f.title}</td>
-                  <td style={td}>{f.pred_likely ?? '—'}h</td>
-                  <td style={td}>{f.actual_hours ?? '—'}h</td>
-                  <td style={td}>{f.estimate_rating ?? '—'}</td>
-                </tr>
+      <div className="fq-split" style={{ ['--side' as string]: '400px' }}>
+        <Card title="My completed work" icon={PackageCheck} iconColor={theme.colors.sage} right={<Hint>Click a tile for the details</Hint>}>
+          {!work.data ? <Loading error={work.error} /> : delivered.length === 0 ? <Empty>Nothing delivered yet.</Empty> : (
+            <div className="fq-cards" style={{ ['--min' as string]: '260px' }}>
+              {delivered.map(d => (
+                <WorkTile key={d.id} d={d} onViewRevision={() => setRevisionFor(d)}
+                  actualHours={(feedback.data ?? []).find(f => f.ticket_id === d.ticket_id)?.actual_hours} />
               ))}
-            </Table>
+            </div>
           )}
         </Card>
 
-        <Card title="I'm comfortable with this type">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <p style={{ margin: 0, fontSize: 12, color: theme.colors.grey }}>
-              Raise your skill for a ticket type, e.g. after training. The team lead approves it before it changes your fit.
-            </p>
-            <Field label="Ticket type">
-              <select value={category} onChange={e => setCategory(e.target.value)} style={inputStyle}>
-                <option value="">Select…</option>
-                {(meta?.categories ?? []).map(c => <option key={c}>{c}</option>)}
-              </select>
-            </Field>
-            <Field label="Why"><input value={reason} onChange={e => setReason(e.target.value)} style={inputStyle} /></Field>
-            <div><Button disabled={!category} onClick={flag}>Send to lead</Button></div>
-            {msg && <Notice tone="ok">{msg}</Notice>}
-            {(flags.data ?? []).map(f => (
-              <div key={f.id} style={{ fontSize: 12 }}>
-                {f.category} {f.adjustment > 0 ? '+' : ''}{f.adjustment} · {f.approved ? <Pill color={theme.colors.sage}>approved</Pill> : <Pill color={theme.colors.sand}>waiting for lead</Pill>}
-                <span style={{ color: theme.colors.grey }}> {fmtDate(f.created_at)}</span>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: theme.space.gap, minWidth: 0 }}>
+          <Card title="Estimates vs actual" icon={Timer} iconColor={theme.colors.accent}>
+            {!feedback.data ? <Loading error={feedback.error} /> : feedback.data.length === 0 ? <Empty>No feedback yet.</Empty> : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {feedback.data.map(f => {
+                  const over = f.pred_likely && f.actual_hours ? f.actual_hours / f.pred_likely : null;
+                  const c = over === null ? theme.colors.grey : over > 1.25 ? theme.colors.red : over < 0.75 ? theme.colors.sand : theme.colors.sage;
+                  return (
+                    <div key={f.id} style={{ padding: '10px 12px', borderRadius: 12, background: theme.colors.background, display: 'flex', gap: 10, alignItems: 'center' }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.title}</div>
+                        <div style={{ fontSize: 11, color: theme.colors.grey }}>estimate {f.pred_likely ?? '—'}h · actual {f.actual_hours ?? '—'}h</div>
+                      </div>
+                      {f.estimate_rating && <Pill color={c}>{f.estimate_rating}</Pill>}
+                    </div>
+                  );
+                })}
               </div>
-            ))}
-          </div>
-        </Card>
+            )}
+          </Card>
+
+          <Card title="I'm comfortable with this type" icon={GraduationCap} iconColor={theme.colors.sand}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <p style={{ margin: 0, fontSize: 12, color: theme.colors.grey }}>
+                Raise your skill for a ticket type, e.g. after training. The team lead approves it before it changes your fit.
+              </p>
+              <Field label="Ticket type">
+                <select value={category} onChange={e => setCategory(e.target.value)} style={inputStyle}>
+                  <option value="">Select…</option>
+                  {(meta?.categories ?? []).map(c => <option key={c}>{c}</option>)}
+                </select>
+              </Field>
+              <Field label="Why"><input value={reason} onChange={e => setReason(e.target.value)} style={inputStyle} /></Field>
+              <div><Button disabled={!category} onClick={flag}>Send to lead</Button></div>
+              {msg && <Notice tone="ok">{msg}</Notice>}
+              {(flags.data ?? []).map(f => (
+                <div key={f.id} style={{ fontSize: 12, display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <strong>{f.category}</strong> {f.adjustment > 0 ? '+' : ''}{f.adjustment}
+                  {f.approved ? <Pill color={theme.colors.sage}>approved</Pill> : <Pill color={theme.colors.sand}>waiting for lead</Pill>}
+                  <span style={{ color: theme.colors.grey }}>{fmtDate(f.created_at)}</span>
+                </div>
+              ))}
+            </div>
+          </Card>
+        </div>
       </div>
       {revisionFor && <RevisionDetailsModal deliverable={revisionFor} user={user} onClose={() => setRevisionFor(null)} />}
-    </Grid>
+    </Page>
   );
 }
 
@@ -96,7 +124,7 @@ function WorkTile({ d, actualHours, onViewRevision }: { d: Deliverable; actualHo
   return (
     <>
       <article onClick={() => setShow(true)} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
-        style={{ border: `1.5px solid ${hover ? theme.colors.accent : theme.colors.track}`, borderRadius: 14,
+        className="fq-lift" style={{ border: `1.5px solid ${hover ? theme.colors.accent : theme.colors.track}`, borderRadius: 14,
           padding: '14px 16px', minWidth: 0, minHeight: 190, display: 'flex', flexDirection: 'column', gap: 6,
           cursor: 'pointer', boxShadow: hover ? theme.shadow : 'none', transition: 'border-color 0.15s, box-shadow 0.15s' }}>
         <h4 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: theme.colors.ink, lineHeight: 1.35,

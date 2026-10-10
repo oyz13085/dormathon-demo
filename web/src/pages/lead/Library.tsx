@@ -1,17 +1,19 @@
 import { useState, type ReactNode } from 'react';
-import { Search, Flag, Paperclip, Link2, MessageSquare, MoreHorizontal, FileText, ExternalLink,
-  RotateCcw, TrendingUp, MessagesSquare, RefreshCw } from 'lucide-react';
+import { Eye, Flag, Paperclip, Link2, MessageSquare, MoreHorizontal, FileText, ExternalLink, Library as LibraryIcon, PackageCheck,
+  RotateCcw, ThumbsUp, TrendingUp, MessagesSquare, RefreshCw } from 'lucide-react';
 import { theme } from '../../theme';
 import { api, qs } from '../../api/client';
 import type { Deliverable, Dept, Feedback, Ticket } from '../../api/types';
 import { useApi, useSession } from '../../session';
 import { DepartmentChip } from '../../components/DepartmentChip';
 import { ANALYST_COLORS } from '../../components/LeaveCalendar';
-import { Button, Empty, Loading, Modal, Pill, card, fmtDate, initials, inputStyle } from '../../components/ui';
+import { Button, Card, Empty, Hint, Loading, Modal, Page, Pill, SearchBox, StatRow, StatTile, TabPills, Toolbar, card, fmtDate, initials, inputStyle } from '../../components/ui';
 
 interface RevisionRow { category: string; delivered: number; revisions: number }
 interface UnderRow { category: string; n_closed: number; actual_over_estimate: number; too_low_votes: number }
 type TicketDetail = Ticket & { deliverables: Deliverable[] };
+const RATING_TABS = ['All', 'Needs revision', 'Awaiting rating', 'Useful'] as const;
+type RatingTab = typeof RATING_TABS[number];
 
 const tint = (d: Dept) => theme.dept[d] + '12';
 const edge = (d: Dept) => theme.dept[d] + '30';
@@ -23,7 +25,7 @@ export default function Library() {
   const [category, setCategory] = useState('');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
-  const [sort, setSort] = useState<'newest' | 'revision'>('newest');
+  const [tab, setTab] = useState<RatingTab>('All');
   const [open, setOpen] = useState<Deliverable | null>(null);
   const [panel, setPanel] = useState<'rework' | 'under' | 'feedback' | null>(null);
 
@@ -32,12 +34,24 @@ export default function Library() {
   const feedback = useApi<Feedback[]>(`/feedback/${qs({ role: 'lead' })}`);
   const under = useApi<UnderRow[]>('/prediction/underestimated');
 
-  const items = [...(lib.data ?? [])].sort((a, b) => sort === 'revision'
-    ? Number(b.requester_rating === 'Needs revision') - Number(a.requester_rating === 'Needs revision') || b.uploaded_at.localeCompare(a.uploaded_at)
-    : b.uploaded_at.localeCompare(a.uploaded_at));
+  const items = [...(lib.data ?? [])].sort((a, b) => b.uploaded_at.localeCompare(a.uploaded_at));
+
+  const all = lib.data ?? [];
+  const rated = (r: string | null) => all.filter(d => (d.requester_rating ?? null) === r).length;
+  const counts = { All: all.length, 'Needs revision': rated('Needs revision'), 'Awaiting rating': rated(null), Useful: rated('Useful') };
+  const shown = items.filter(d => tab === 'All' || (tab === 'Awaiting rating' ? !d.requester_rating : d.requester_rating === tab));
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: theme.space.gap }}>
+    <Page>
+      <Card title="Deliverables library" icon={LibraryIcon} iconColor={theme.colors.accent} right={<Hint>Everything the team has handed back, with the requester's rating</Hint>}>
+        <StatRow>
+          <StatTile icon={PackageCheck} color={theme.colors.ink} label="Delivered" value={all.length} hint="in the current filter" />
+          <StatTile icon={ThumbsUp} color={theme.colors.sage} label="Useful" value={counts.Useful} hint="rated by the requester" />
+          <StatTile icon={RotateCcw} color={theme.colors.red} label="Needs revision" value={counts['Needs revision']} hint="sent back" />
+          <StatTile icon={Eye} color={theme.colors.sand} label="Awaiting rating" value={counts['Awaiting rating']} hint="not rated yet" />
+        </StatRow>
+      </Card>
+
       {/* Three summary widgets */}
       <div className="fq-grid3">
         <ReworkWidget rows={stats.data?.revisions_by_category} error={stats.error} onMore={() => setPanel('rework')} />
@@ -45,41 +59,35 @@ export default function Library() {
         <FeedbackWidget rows={feedback.data} error={feedback.error} onMore={() => setPanel('feedback')} />
       </div>
 
-      {/* Filters */}
-      <section style={{ ...card, padding: '14px 18px', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-        <h2 style={{ margin: 0, fontSize: theme.font.title, fontWeight: 600, marginRight: 6 }}>Deliverables library</h2>
-        <span style={{ fontSize: 12, color: theme.colors.grey }}>{lib.data ? `${items.length} item${items.length === 1 ? '' : 's'}` : ''}</span>
-        <div style={{ flex: 1 }} />
-        <div style={{ position: 'relative', minWidth: 200 }}>
-          <Search size={14} color={theme.colors.grey} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)' }} />
-          <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search title or summary" style={{ ...inputStyle, paddingLeft: 30, borderRadius: theme.radius.pill }} />
+      <Card title="All deliverables" icon={FileText} iconColor={theme.colors.accent} right={<Hint>Click a card for the summary and files</Hint>}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 14 }}>
+          <Toolbar>
+            <TabPills tabs={RATING_TABS} value={tab} onChange={setTab} counts={counts} />
+            <SearchBox value={q} onChange={setQ} placeholder="Search title or summary" />
+          </Toolbar>
+          <div className="fq-cards-fit" style={{ ['--min' as string]: '150px', gap: 8 }}>
+            <select value={division} onChange={e => setDivision(e.target.value as Dept)} style={inputStyle} aria-label="Department">
+              <option value="">All departments</option>{(meta?.departments ?? []).map(d => <option key={d}>{d}</option>)}
+            </select>
+            <select value={category} onChange={e => setCategory(e.target.value)} style={inputStyle} aria-label="Category">
+              <option value="">All types</option>{(meta?.categories ?? []).map(c => <option key={c}>{c}</option>)}
+            </select>
+            <input type="date" value={from} onChange={e => setFrom(e.target.value)} style={inputStyle} aria-label="From" title="Delivered from" />
+            <input type="date" value={to} onChange={e => setTo(e.target.value)} style={inputStyle} aria-label="To" title="Delivered until" />
+          </div>
         </div>
-        <select value={division} onChange={e => setDivision(e.target.value as Dept)} style={{ ...inputStyle, width: 'auto' }} aria-label="Department">
-          <option value="">All departments</option>{(meta?.departments ?? []).map(d => <option key={d}>{d}</option>)}
-        </select>
-        <select value={category} onChange={e => setCategory(e.target.value)} style={{ ...inputStyle, width: 'auto' }} aria-label="Category">
-          <option value="">All types</option>{(meta?.categories ?? []).map(c => <option key={c}>{c}</option>)}
-        </select>
-        <input type="date" value={from} onChange={e => setFrom(e.target.value)} style={{ ...inputStyle, width: 'auto' }} aria-label="From" />
-        <input type="date" value={to} onChange={e => setTo(e.target.value)} style={{ ...inputStyle, width: 'auto' }} aria-label="To" />
-        <select value={sort} onChange={e => setSort(e.target.value as 'newest' | 'revision')} style={{ ...inputStyle, width: 'auto' }} aria-label="Sort">
-          <option value="newest">Newest first</option>
-          <option value="revision">Needs revision first</option>
-        </select>
-      </section>
-
-      {/* Deliverable cards, three per row */}
-      {!lib.data ? <Loading error={lib.error} /> : items.length === 0 ? <section style={card}><Empty>No deliverables match.</Empty></section> : (
-        <div className="fq-grid3">
-          {items.map(d => <DeliverableCard key={d.id} d={d} onOpen={() => setOpen(d)} />)}
-        </div>
-      )}
+        {!lib.data ? <Loading error={lib.error} /> : shown.length === 0 ? <Empty>No deliverables match.</Empty> : (
+          <div className="fq-cards" style={{ ['--min' as string]: '260px' }}>
+            {shown.map(d => <DeliverableCard key={d.id} d={d} onOpen={() => setOpen(d)} />)}
+          </div>
+        )}
+      </Card>
 
       {open && <DeliverableDetail d={open} feedback={(feedback.data ?? []).filter(f => f.ticket_id === open.ticket_id)} onClose={() => setOpen(null)} />}
       {panel === 'rework' && <Modal title="Rework by ticket type" onClose={() => setPanel(null)}><ReworkList rows={stats.data?.revisions_by_category ?? []} /></Modal>}
       {panel === 'under' && <Modal title="Regularly underestimated ticket types" onClose={() => setPanel(null)}><UnderList rows={under.data ?? []} /></Modal>}
       {panel === 'feedback' && <Modal title="All feedback" onClose={() => setPanel(null)} width={640}><FeedbackList rows={feedback.data ?? []} /></Modal>}
-    </div>
+    </Page>
   );
 }
 
@@ -108,7 +116,7 @@ function DeliverableCard({ d, onOpen }: { d: Deliverable; onOpen: () => void }) 
   const meta = { display: 'inline-flex', alignItems: 'center', gap: 4 } as const;
   return (
     <button onClick={onOpen} className="fq-lift" style={{
-      textAlign: 'left', font: 'inherit', color: 'inherit', cursor: 'pointer', width: '100%',
+      textAlign: 'left', font: 'inherit', color: 'inherit', cursor: 'pointer', width: '100%', minWidth: 0,
       background: theme.colors.card, border: `1px solid ${theme.colors.track}`, borderRadius: 14, padding: 14,
       display: 'flex', flexDirection: 'column', gap: 10,
     }}>

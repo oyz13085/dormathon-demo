@@ -3,7 +3,7 @@ import type { ElementType, ReactNode } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   AlertCircle, AlertTriangle, ArrowRight, BookOpen, CalendarCheck, CalendarOff, Check, CheckCircle, Clock, Flag, GraduationCap, Handshake,
-  HelpCircle, Hourglass, Inbox, LifeBuoy, Search, Target, Undo2, UserCheck, Users, X,
+  HelpCircle, Hourglass, Inbox, LifeBuoy, Target, Undo2, UserCheck, Users, X,
 } from 'lucide-react';
 import { theme } from '../../theme';
 import { api, qs } from '../../api/client';
@@ -12,7 +12,7 @@ import { useApi, useSession } from '../../session';
 import { DepartmentChip } from '../../components/DepartmentChip';
 import { StatusPill } from '../../components/StatusPill';
 import { Avatar, TicketCard } from '../../components/TicketModals';
-import { Button, Card, Loading, Notice, PRIORITY_COLOR, Pill, StatTile, cardGrid, fmtDate, inputStyle } from '../../components/ui';
+import { Button, Card, FilterChip, Hint, Loading, MiniStat, Notice, PRIORITY_COLOR, Page, Pill, SearchBox, StatRow, StatTile, TabPills, Toolbar, cardGrid, fmtDate, inputStyle } from '../../components/ui';
 
 type Tab = 'Unassigned' | 'At risk' | 'All open';
 
@@ -54,47 +54,27 @@ export default function Assign() {
   const hoursWaiting = Math.round(unassigned.reduce((s, t) => s + (t.pred_likely ?? 0), 0));
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: theme.space.gap }}>
+    <Page>
       <Card title="Assign work" icon={UserCheck} iconColor={theme.colors.accent}
-        right={<span style={{ fontSize: 11, color: theme.colors.grey }}>Pick a ticket, compare the team, assign</span>}>
-        <div style={cardGrid(170)}>
+        right={<Hint>Pick a ticket, compare the team, assign</Hint>}>
+        <StatRow>
           <StatTile icon={Inbox} color={theme.colors.ink} label="Waiting for an owner" value={unassigned.length} hint={`${hoursWaiting}h of work`} />
           <StatTile icon={HelpCircle} color={theme.colors.sand} label="New ticket types" value={newTypes} hint={newTypes ? 'need your decision' : 'none to decide'} />
           <StatTile icon={Clock} color={theme.colors.accent} label="Unassigned, due this week" value={dueSoon} hint="assign these first" />
           <StatTile icon={AlertCircle} color={theme.colors.red} label="At risk" value={open.filter(isRisky).length} hint="may need a reassign" />
           <StatTile icon={Users} color={theme.colors.sage} label="Team free hours" value={`${free}h`} hint="this week, after open work" />
-        </div>
+        </StatRow>
       </Card>
 
       <Card title="Tickets" icon={Inbox} iconColor={theme.colors.accent}
-        right={division ? (
-          <button onClick={() => setDivision(null)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: theme.radius.pill,
-            border: 'none', background: theme.colors.track, cursor: 'pointer', fontSize: 12, fontWeight: 600, color: theme.colors.ink }}>
-            Showing {division} only <X size={12} />
-          </button>
-        ) : <span style={{ fontSize: 11, color: theme.colors.grey }}>Unassigned and new types first · click a ticket to assign it</span>}>
-        <div style={{ display: 'flex', gap: 12, marginBottom: 14, flexWrap: 'wrap', alignItems: 'center' }}>
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            {(['Unassigned', 'At risk', 'All open'] as Tab[]).map(t => {
-              const n = t === 'Unassigned' ? unassigned.length : t === 'At risk' ? open.filter(isRisky).length : open.length;
-              return (
-                <button key={t} onClick={() => setTab(t)} style={{
-                  padding: '6px 14px', borderRadius: theme.radius.pill, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600,
-                  background: tab === t ? theme.colors.ink : theme.colors.track, color: tab === t ? '#fff' : theme.colors.ink,
-                }}>{t} <span style={{ opacity: 0.6 }}>{n}</span></button>
-              );
-            })}
-          </div>
-          <div style={{ position: 'relative', marginLeft: 'auto', width: 280, maxWidth: '100%' }}>
-            <Search size={14} color={theme.colors.grey} style={{ position: 'absolute', left: 12, top: 11 }} />
-            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search tickets…" style={{ ...inputStyle, paddingLeft: 32, paddingRight: 32 }} />
-            {search && (
-              <button onClick={() => setSearch('')} aria-label="Clear search" style={{ position: 'absolute', right: 8, top: 7, width: 22, height: 22,
-                borderRadius: '50%', border: 'none', background: theme.colors.track, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <X size={12} />
-              </button>
-            )}
-          </div>
+        right={division ? <FilterChip onClear={() => setDivision(null)}>Showing {division} only</FilterChip>
+          : <Hint>Unassigned and new types first · click a ticket to assign it</Hint>}>
+        <div style={{ marginBottom: 14 }}>
+          <Toolbar>
+            <TabPills tabs={['Unassigned', 'At risk', 'All open'] as const} value={tab} onChange={setTab}
+              counts={{ Unassigned: unassigned.length, 'At risk': open.filter(isRisky).length, 'All open': open.length }} />
+            <SearchBox value={search} onChange={setSearch} placeholder="Search tickets…" />
+          </Toolbar>
         </div>
         {!tickets.data ? <Loading error={tickets.error} /> : shown.length === 0 ? (
           <div style={{ padding: '24px 0', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
@@ -124,7 +104,7 @@ export default function Assign() {
             next={unassigned.find(t => t.id !== selected.id) ?? null} onNext={id => setParams({ ticket: String(id) })} />
         </AssignWindow>
       )}
-    </div>
+    </Page>
   );
 }
 
@@ -136,10 +116,10 @@ function AssignWindow({ onClose, children }: { onClose: () => void; children: Re
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(35,37,43,0.4)', zIndex: 200,
+    <div onClick={onClose} className="fq-modal-backdrop" style={{ position: 'fixed', inset: 0, background: 'rgba(35,37,43,0.4)', zIndex: 200,
       display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '40px 16px', overflowY: 'auto' }}>
       <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 1080, background: theme.colors.background,
-        borderRadius: theme.radius.card, padding: 20, boxShadow: '0 20px 60px rgba(35,37,43,0.25)' }}>
+        borderRadius: theme.radius.card, padding: 'clamp(10px, 2vw, 20px)', boxShadow: '0 20px 60px rgba(35,37,43,0.25)', containerType: 'inline-size' }}>
         {children}
       </div>
     </div>
@@ -242,7 +222,7 @@ function TicketPanel({ ticket, next, onNext, onClose }: {
               {c.category && <Pill>{c.category}</Pill>}
             </div>
           </div>
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-start' }}>
             <MiniStat label="Estimate" value={`${c.hours.likely}h`} sub={`${c.hours.low}–${c.hours.high}h`} />
             <MiniStat label="Deadline" value={fmtDate(ticket.deadline)} sub={daysLeft(ticket.deadline)} />
             <MiniStat label="Owner" value={ticket.assignee_name ?? '—'} sub={ticket.assignee_name ? 'assigned' : 'unassigned'} />
@@ -330,7 +310,7 @@ function TicketPanel({ ticket, next, onNext, onClose }: {
 
       {/* Step 2: anyone on the team */}
       <Card title={c.recommended ? 'Or pick someone else' : 'Pick an analyst'} icon={Users} iconColor={theme.colors.sand}
-        right={<span style={{ fontSize: 11, color: theme.colors.grey }}>Best options first · tap a card to select</span>}>
+        right={<Hint>Best options first · tap a card to select</Hint>}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {rows.map(r => <AnalystCard key={r.analyst_id} r={r} thresholds={c.thresholds} high={c.hours.high} selected={picked === r.analyst_id} onPick={() => pick(r.analyst_id)} />)}
         </div>
@@ -340,7 +320,7 @@ function TicketPanel({ ticket, next, onNext, onClose }: {
 
       {!!c.similar_work?.length && (
         <Card title="Similar work already delivered" icon={BookOpen} iconColor={theme.colors.sage}
-          right={<span style={{ fontSize: 11, color: theme.colors.grey }}>Share these with whoever picks it up</span>}>
+          right={<Hint>Share these with whoever picks it up</Hint>}>
           <div style={cardGrid(260)}>
             {c.similar_work.map(w => (
               <a key={w.deliverable_id} href={api.fileUrl(w.deliverable_id)} target="_blank" rel="noreferrer" className="fq-lift" style={{
@@ -437,16 +417,6 @@ function daysLeft(deadline: string): string {
   return n > 0 ? `in ${n} day${n !== 1 ? 's' : ''}` : n === 0 ? 'today' : `${-n} days overdue`;
 }
 
-function MiniStat({ label, value, sub }: { label: string; value: string; sub: string }) {
-  return (
-    <div style={{ padding: '10px 14px', borderRadius: 12, background: theme.colors.background, minWidth: 96 }}>
-      <div style={{ fontSize: 11, color: theme.colors.grey }}>{label}</div>
-      <div style={{ fontSize: 15, fontWeight: 700, marginTop: 2 }}>{value}</div>
-      <div style={{ fontSize: 11, color: theme.colors.grey }}>{sub}</div>
-    </div>
-  );
-}
-
 type Factor = keyof Candidate['breakdown'];
 
 // Each part of the fit score, with what a high or low value means in plain words
@@ -494,7 +464,7 @@ function AnalystCard({ r, thresholds, high, selected, onPick }: {
       border: `2px solid ${selected ? theme.colors.ink : rec ? theme.colors.accent + '80' : theme.colors.track}`,
       display: 'flex', flexDirection: 'column', gap: 8, minWidth: 0,
     }}>
-      <div className="fq-grid" style={{ display: 'grid', gridTemplateColumns: '250px 44px 96px 80px minmax(0,1fr)', gap: 14, alignItems: 'center' }}>
+      <div className="fq-analyst-row">
         {/* Who */}
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', minWidth: 0 }}>
           <span style={{ width: 18, height: 18, borderRadius: '50%', flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
@@ -588,7 +558,7 @@ function PriorityCard({ ticket }: { ticket: Ticket }) {
   const changed = priority !== ticket.priority;
   return (
     <Card title="Priority" icon={Flag} iconColor={PRIORITY_COLOR[priority]}
-      right={<span style={{ fontSize: 11, color: theme.colors.grey }}>The lead has the final say</span>}>
+      right={<Hint>The lead has the final say</Hint>}>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, marginBottom: 10 }}>
         {(['Low', 'Medium', 'High', 'Critical'] as Priority[]).map(p => {
           const on = priority === p;

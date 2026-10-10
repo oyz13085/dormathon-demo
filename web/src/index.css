@@ -26,18 +26,78 @@
 
 *, *::before, *::after { box-sizing: border-box; }
 
+/* Spacing that scales with the window: tight on a phone, roomy on a desktop */
+:root {
+  --fq-pad: clamp(16px, 2.2vw, 24px);
+  --fq-page: clamp(12px, 2.4vw, 28px);
+}
+
 body {
   margin: 0;
   background: var(--color-background);
   font-family: var(--font-family-sans);
   color: var(--color-ink);
   -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
 }
 
 #root {
   min-height: 100svh;
   display: flex;
   flex-direction: column;
+}
+
+img, svg, canvas { max-width: 100%; }
+
+/* ── App shell ─────────────────────────────────────────────────────────── */
+.fq-main { flex: 1; width: 100%; max-width: 1600px; margin: 0 auto; padding: var(--fq-page); min-width: 0; }
+
+.fq-topbar {
+  position: sticky; top: 0; z-index: 100; background: var(--color-card);
+  border-bottom: 1px solid var(--color-track); box-shadow: 0 1px 4px rgba(35,37,43,0.05);
+  padding: 8px var(--fq-page);
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 8px 16px;
+}
+.fq-nav { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; min-width: 0; }
+.fq-nav::-webkit-scrollbar { display: none; }
+.fq-nav a { flex-shrink: 0; white-space: nowrap; }
+.fq-roles { display: flex; align-items: center; gap: 6px; justify-content: flex-end; }
+.fq-roles-label { font-size: 11px; color: var(--color-grey); }
+/* Narrow: logo + roles on the first row, nav scrolls sideways on its own row */
+@media (max-width: 1100px) {
+  .fq-topbar { grid-template-columns: auto minmax(0, 1fr); }
+  .fq-nav { grid-column: 1 / -1; grid-row: 2; }
+}
+@media (max-width: 560px) {
+  .fq-roles-label, .fq-brand-name { display: none; }
+  .fq-roles select { max-width: 120px; }
+}
+
+/* ── Page building blocks ─────────────────────────────────────────────── */
+.fq-stat-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)); gap: 12px; }
+.fq-stat { padding: 16px; }
+.fq-stat-value { font-size: 32px; }
+@media (max-width: 560px) {
+  .fq-stat-row { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .fq-stat { padding: 12px; gap: 6px !important; }
+  .fq-stat-value { font-size: 24px; }
+}
+.fq-highlights { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: var(--spacing-gap); }
+.fq-toolbar { display: flex; gap: 10px 12px; flex-wrap: wrap; align-items: center; }
+.fq-toolbar > .fq-search { margin-left: auto; width: 280px; max-width: 100%; }
+@media (max-width: 640px) { .fq-toolbar > .fq-search { width: 100%; margin-left: 0; } }
+
+/* Grids whose column count follows the space they have */
+.fq-cards { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--min, 240px)), 1fr)); }
+.fq-cards-fit { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--min, 240px)), 1fr)); }
+
+/* Two-column page layouts: main + side panel; stack below 1000px */
+.fq-split { display: grid; gap: var(--spacing-gap); grid-template-columns: minmax(0, 1fr) minmax(300px, var(--side, 380px)); align-items: start; }
+@media (max-width: 1000px) { .fq-split { grid-template-columns: minmax(0, 1fr); } }
+
+/* Dialogs: less outer space on a phone */
+@media (max-width: 560px) {
+  .fq-modal-backdrop { padding: 12px 8px !important; }
 }
 
 /* Diagonal-hatch SVG pattern used by HatchedBar */
@@ -52,8 +112,8 @@ body {
 }
 
 /* Stack multi-column layouts on narrow screens */
-@media (max-width: 900px) {
-  .fq-grid { grid-template-columns: 1fr !important; }
+@media (max-width: 1000px) {
+  .fq-grid { grid-template-columns: minmax(0, 1fr) !important; }
 }
 
 /* Ticket cards: columns follow the space the grid actually has, not the window */
@@ -105,4 +165,22 @@ body {
   align-items: stretch;
 }
 @media (max-width: 1100px) { .fq-grid3 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 700px)  { .fq-grid3 { grid-template-columns: 1fr; } }
+@media (max-width: 700px)  { .fq-grid3 { grid-template-columns: minmax(0, 1fr); } }
+
+/* Assign: one analyst per row. Wide: everything on one line. Narrower: score parts drop to their own line. */
+.fq-analyst-row { display: grid; grid-template-columns: minmax(180px, 250px) 44px 96px 80px minmax(0, 1fr); gap: 14px; align-items: center; }
+@container (max-width: 900px) {
+  .fq-analyst-row { grid-template-columns: minmax(0, 1fr) 44px 96px 80px; }
+  .fq-analyst-row > :last-child { grid-column: 1 / -1; }
+}
+@container (max-width: 520px) {
+  .fq-analyst-row { grid-template-columns: minmax(0, 1fr) 44px; }
+  .fq-analyst-row > :nth-child(3), .fq-analyst-row > :nth-child(4) { grid-column: span 1; }
+}
+
+/* Sliders in the theme colours: filled part in --c, the rest as track */
+.fq-range { -webkit-appearance: none; appearance: none; width: 100%; height: 6px; border-radius: 3px; outline: none; margin: 8px 0;
+  background: linear-gradient(to right, var(--c) var(--p), var(--color-track) var(--p)); cursor: pointer; }
+.fq-range::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: #fff; border: 2.5px solid var(--c); box-shadow: 0 1px 3px rgba(35,37,43,0.2); }
+.fq-range::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: #fff; border: 2.5px solid var(--c); }
+.fq-range:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 4px; }
