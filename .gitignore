@@ -14,3 +14,4 @@ backend/artifacts/
 .claude/
 .history/
 *.log
+.playwright-mcp/
