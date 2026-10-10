@@ -75,6 +75,8 @@ export interface RiskItem {
   impact: number;
   risk_x_impact: number;
   hours_needed: number;
+  hours_low?: number;
+  hours_high?: number;
   hours_available: number;
   expected_completion?: string | null;
   alert: boolean;
@@ -85,6 +87,7 @@ export interface RiskList {
   alerts: RiskItem[];
   suppressed: number;
   watch: RiskItem[];
+  all?: RiskItem[];
 }
 
 export interface Candidate {
@@ -133,6 +136,8 @@ export interface RecommendationCard {
 }
 
 export interface Suggestion {
+  division: Dept;
+  division_method: "llm" | "rule-based";
   category: string;
   category_method: string;
   confidence: "High" | "Low";
@@ -144,7 +149,7 @@ export interface Suggestion {
     decision: RecommendationCard["decision"];
     note?: string;
     explanation?: string;
-    recommended: Pick<Candidate, "analyst_id" | "name" | "fit" | "explanation" | "low_confidence"> | null;
+    recommended: Pick<Candidate, "analyst_id" | "name" | "fit" | "explanation" | "low_confidence" | "breakdown" | "free_hours" | "open_hours" | "past_in_category" | "past_with_requester"> | null;
     usual_partner: Pick<Candidate, "analyst_id" | "name" | "fit" | "explanation" | "low_confidence"> | null;
     support: Pick<Candidate, "analyst_id" | "name" | "fit" | "explanation" | "low_confidence"> | null;
   };
@@ -217,7 +222,34 @@ export interface ForecastWeek {
   spikes: Dept[];
   message: string;
 }
-export interface Forecast { weeks: ForecastWeek[]; method: string }
+export interface ForecastHistoryWeek { week_start: string; label: string; departments: Record<Dept, number> }
+export interface Forecast { weeks: ForecastWeek[]; history?: ForecastHistoryWeek[]; method: string }
+
+export interface TicketDetail extends Ticket {
+  deliverables: Deliverable[];
+  assignments?: { chosen_name?: string; recommended_name?: string; override_reason?: string | null;
+    support_name?: string | null; is_handover?: number; decided_at: string }[];
+}
+
+// "If this ticket moves to X": result of /assignment/move-impact/{id}
+export interface QueueShift {
+  ticket_id: number; title: string; deadline: string;
+  p_miss_before: number; p_miss_after: number; crosses: boolean;
+}
+export interface MoveOption extends Candidate {
+  weekly_hours: number;
+  p_miss_if_moved: number;
+  expected_completion: string | null;
+  leave_days: string[];
+  affected: QueueShift[];
+  verdict: "good" | "tight" | "harms" | "no";
+  verdict_note: string;
+}
+export interface MoveImpact {
+  ticket_id: number; title: string; deadline: string; threshold: number;
+  current: { analyst_id: number; name: string; p_miss_now: number | null; relief: QueueShift[] } | null;
+  options: MoveOption[];
+}
 
 export interface FitSettings {
   w_skill: number; w_track: number; w_pairing: number; w_capacity: number; w_deadline: number;

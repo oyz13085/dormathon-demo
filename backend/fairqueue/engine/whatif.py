@@ -55,3 +55,71 @@ def whatif_leave(analyst_id: int, start_date: str, end_date: str, leave_id: int 
     return {"analyst_id": analyst_id, "analyst_name": analyst["name"],
             "start_date": start_date, "end_date": end_date, "summary": summary,
             "broken": broken, "unaffected": unaffected}
+
+
+def whatif_move(ticket_id: int) -> dict | None:
+    """
+    "Who can take this risky ticket, and what does it cost them?"
+
+    For every analyst: rerun their queue with the ticket added, and report the ticket's
+    chance of missing there, plus how each of their own tickets shifts. The current
+    assignee's queue is rerun without it to show the relief.
+    """
+    from datetime import date
+    t = repo.get_ticket(ticket_id)
+    if not t or t["status"] == "Closed":
+        return None
+    current_id = t.get("assignee_id")
+    deadline = schedule.parse_day(t["deadline"])
+    today = date.today()
+    moved = {**t, "status": "Assigned"}
+
+    def shifts(before: list, after: list) -> list[dict]:
+        b = {s.ticket_id: s for s in before}
+        titles = {x["id"]: x["title"] for x in repo.get_tickets()}
+        out = []
+        for s in after:
+            if s.ticket_id == ticket_id or s.ticket_id not in b:
+                continue
+            p0, p1 = b[s.ticket_id].p_miss, s.p_miss
+            if abs(p1 - p0) >= 0.01:
+                out.append({"ticket_id": s.ticket_id, "title": titles.get(s.ticket_id, f"#{s.ticket_id}"),
+                            "deadline": s.deadline.isoformat(), "p_miss_before": p0, "p_miss_after": p1,
+                            "crosses": p1 >= ALERT_THRESHOLD and p0 < ALERT_THRESHOLD})
+        return sorted(out, key=lambda r: -(r["p_miss_after"] - r["p_miss_before"]))
+
+    current = None
+    if current_id:
+        before = schedule.analyst_queue(current_id)
+        now = next((s for s in before if s.ticket_id == ticket_id), None)
+        after = schedule.analyst_queue(current_id, exclude={ticket_id})
+        current = {"analyst_id": current_id, "name": (repo.get_analyst(current_id) or {}).get("name"),
+                   "p_miss_now": now.p_miss if now else None, "relief": shifts(before, after)}
+
+    options = []
+    for c in candidates(t):
+        if c.analyst_id == current_id:
+            continue
+        analyst = repo.get_analyst(c.analyst_id) or {}
+        before = schedule.analyst_queue(c.analyst_id)
+        after = schedule.analyst_queue(c.analyst_id, extra_ticket=moved)
+        slot = next(s for s in after if s.ticket_id == ticket_id)
+        affected = shifts(before, after)
+        leave = sorted(d.isoformat() for d in schedule.leave_days(c.analyst_id) if today <= d <= deadline)
+        harms = any(a["crosses"] for a in affected)
+        if slot.p_miss >= ALERT_THRESHOLD:
+            verdict, note = "no", f"Still {round(slot.p_miss * 100)}% likely to miss with {c.name}"
+        elif harms:
+            n = sum(a["crosses"] for a in affected)
+            verdict, note = "harms", f"Puts {n} of {c.name}'s own ticket{'s' if n != 1 else ''} at risk"
+        elif slot.p_miss >= 0.3 or leave:
+            verdict, note = "tight", ("Has leave before the deadline" if leave else "Fits, but with little slack")
+        else:
+            verdict, note = "good", "Fits without putting anything else at risk"
+        options.append({**c.dict(), "weekly_hours": analyst.get("weekly_hours"),
+                        "p_miss_if_moved": slot.p_miss, "expected_completion": slot.finish.isoformat() if slot.finish else None,
+                        "leave_days": leave, "affected": affected, "verdict": verdict, "verdict_note": note})
+    rank = {"good": 0, "tight": 1, "harms": 2, "no": 3}
+    options.sort(key=lambda o: (rank[o["verdict"]], o["p_miss_if_moved"], -o["fit"]))
+    return {"ticket_id": ticket_id, "title": t["title"], "deadline": t["deadline"],
+            "threshold": ALERT_THRESHOLD, "current": current, "options": options}

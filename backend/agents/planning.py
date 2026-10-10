@@ -6,14 +6,12 @@ Every number comes from a FairQueue tool (what-if, forecast, risk, workload), ne
 from the model. Without an API key, or if the call fails, a rule-based answer is used.
 """
 from __future__ import annotations
-import json
 from datetime import date, timedelta
-from fairqueue.config import LLM
 from fairqueue.db import repo
 from fairqueue.engine.forecast import forecast
 from fairqueue.engine.risk import risk_list
 from fairqueue.engine.whatif import whatif_leave
-from fairqueue.llm import _get_client
+from fairqueue.llm import tool_loop
 
 TOOLS = [
     {"name": "what_if_leave", "description": "Which deadlines break if an analyst is on leave for a date range.",
@@ -22,11 +20,11 @@ TOOLS = [
          "end_date": {"type": "string", "description": "YYYY-MM-DD"}},
          "required": ["analyst_name", "start_date", "end_date"], "additionalProperties": False}},
     {"name": "volume_forecast", "description": "Forecast ticket hours vs team capacity for the coming weeks.",
-     "input_schema": {"type": "object", "properties": {"n_weeks": {"type": "integer"},
-                                                       "division": {"type": "string"}},
+     "input_schema": {"type": "object", "properties": {"n_weeks": {"type": ["integer", "null"]},
+                                                       "division": {"type": ["string", "null"]}},
                       "required": [], "additionalProperties": False}},
     {"name": "at_risk_tickets", "description": "Open tickets likely to miss their deadline, with causes.",
-     "input_schema": {"type": "object", "properties": {"division": {"type": "string"}},
+     "input_schema": {"type": "object", "properties": {"division": {"type": ["string", "null"]}},
                       "required": [], "additionalProperties": False}},
     {"name": "workload", "description": "Open predicted hours per analyst against weekly hours.",
      "input_schema": {"type": "object", "properties": {}, "required": [], "additionalProperties": False}},
@@ -71,40 +69,26 @@ def _fallback(question: str) -> dict:
         top = "; ".join(f"'{x['ticket_title']}' ({round(x['p_miss'] * 100)}%, {x['cause']})" for x in r["alerts"])
         return {"answer": f"{len(r['alerts'])} ticket(s) are above the alert threshold" + (f": {top}." if top else "."),
                 "data": r["alerts"], "method": "rule-based"}
+    if any(w in q for w in ("spare", "free", "who has", "who can", "available", "busy", "workload", "overload")):
+        from fairqueue.engine.schedule import open_hours
+        rows = sorted(({"name": a["name"], "free": round(a["weekly_hours"] - open_hours(a["id"]), 1),
+                        "weekly": a["weekly_hours"]} for a in repo.get_analysts()), key=lambda r: -r["free"])
+        free = [r for r in rows if r["free"] > 0]
+        full = [r["name"] for r in rows if r["free"] <= 0]
+        answer = ("Most free this week: " + ", ".join(f"{r['name']} ({r['free']:g}h of {r['weekly']:g}h)" for r in free[:3]) + "."
+                  if free else "Nobody has free hours this week.")
+        if full:
+            answer += f" Fully booked: {', '.join(full)}."
+        return {"answer": answer, "data": rows, "method": "rule-based"}
     f = forecast(2)
     return {"answer": " ".join(w["message"] for w in f["weeks"]), "data": f, "method": "rule-based"}
 
 
 def run(question: str) -> dict:
-    client = _get_client()
-    if client is None:
-        return _fallback(question)
     system = (f"You help the lead of a data analytics team plan capacity. Today is {date.today().isoformat()} "
               f"({date.today().strftime('%A')}). Call tools to get every number; never estimate numbers yourself. "
               "Answer in 2-4 plain sentences. Never rank analysts by speed.")
-    messages = [{"role": "user", "content": question}]
-    calls = []
-    try:
-        for _ in range(6):
-            resp = client.with_options(timeout=30.0, max_retries=1).messages.create(
-                model=LLM["model"], max_tokens=4096, system=system, tools=TOOLS, messages=messages,
-                output_config={"effort": LLM.get("effort", "low")})
-            if resp.stop_reason == "tool_use":
-                messages.append({"role": "assistant", "content": resp.content})
-                results = []
-                for b in resp.content:
-                    if b.type == "tool_use":
-                        out = _dispatch(b.name, b.input)
-                        calls.append({"tool": b.name, "input": b.input})
-                        results.append({"type": "tool_result", "tool_use_id": b.id,
-                                        "content": json.dumps(out, default=str)[:20000]})
-                messages.append({"role": "user", "content": results})
-                continue
-            if resp.stop_reason == "end_turn":
-                text = "".join(b.text for b in resp.content if b.type == "text").strip()
-                if text:
-                    return {"answer": text, "tool_calls": calls, "method": "llm"}
-            break
-    except Exception:
-        pass
+    _, calls, text = tool_loop(system, question, TOOLS, _dispatch)
+    if text:
+        return {"answer": text, "tool_calls": calls, "method": "llm"}
     return _fallback(question)

@@ -11,11 +11,15 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 _tmp = tempfile.mkdtemp()
 os.environ["DB_PATH"] = os.path.join(_tmp, "test.db")
 os.environ["UPLOADS_DIR"] = os.path.join(_tmp, "uploads")
-os.environ.pop("ANTHROPIC_API_KEY", None)        # exercise the rule-based fallbacks
 
 from fastapi.testclient import TestClient        # noqa: E402
 from fairqueue.db.seed import seed               # noqa: E402
 import main                                      # noqa: E402
+# After imports: config.load_dotenv() refills keys from backend/.env, so pop
+# here to keep the suite hermetic (rule-based fallbacks, no billed calls).
+os.environ.pop("ANTHROPIC_API_KEY", None)
+os.environ.pop("GEMINI_API_KEY", None)
+os.environ.pop("GROQ_API_KEY", None)
 
 seed()
 client = TestClient(main.app)
@@ -95,6 +99,7 @@ def test_suggest_and_submit():
             "requester": "Nurul Huda", "description": "Variance by cost centre for month-end"}
     s = client.post("/tickets/suggest", json=body).json()
     assert s["priority_method"] == "rule-based" and s["priority"] in ("Low", "Medium", "High")
+    assert s["division"] == "Finance" and s["division_method"] == "rule-based"
     assert s["category"] == "Reporting" and s["hours"]["low"] <= s["hours"]["likely"] <= s["hours"]["high"]
     r = client.post("/tickets/", json={**body, "priority": "High", "category": s["category"],
                                        "suggested_priority": s["priority"]})

@@ -6,6 +6,8 @@ from fairqueue.assignment.router import router as assignment
 from fairqueue.lifecycle.router import router as lifecycle, deliverables_router, feedback_router
 from fairqueue.planning.router import router as planning
 from fairqueue.prediction.router import router as prediction
+from fairqueue.requester.router import router as requester
+from fairqueue.leave_advisor.router import router as leave_advisor
 
 
 @asynccontextmanager
@@ -39,6 +41,8 @@ app.include_router(feedback_router, prefix="/feedback", tags=["feedback"])
 app.include_router(prediction, prefix="/prediction", tags=["prediction"])
 app.include_router(assignment, prefix="/assignment", tags=["assignment"])
 app.include_router(planning, prefix="/planning", tags=["planning"])
+app.include_router(requester, prefix="/requester", tags=["requester"])
+app.include_router(leave_advisor, prefix="/leave-advisor", tags=["leave advisor"])
 
 
 @app.get("/health")
@@ -51,13 +55,13 @@ def meta():
     """Everything the role switcher and forms need."""
     from fairqueue.config import DEPARTMENTS, LLM, ALERT_THRESHOLD, ALERTS_PER_DAY
     from fairqueue.db import repo
-    from fairqueue.llm import _get_client
+    from fairqueue.llm import llm_enabled
     from fairqueue.models.hours import known_categories
     return {"departments": DEPARTMENTS, "categories": known_categories(),
             "analysts": [{"id": a["id"], "name": a["name"], "role_title": a.get("role_title")}
                          for a in repo.get_analysts()],
             "requesters": repo.get_requesters(),
-            "llm": {"model": LLM["model"], "enabled": _get_client() is not None},
+            "llm": {"model": LLM["model"], "enabled": llm_enabled()},
             "alerts": {"threshold": ALERT_THRESHOLD, "max_per_day": ALERTS_PER_DAY}}
 
 

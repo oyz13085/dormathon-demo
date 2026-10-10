@@ -1,4 +1,4 @@
-import { useEffect, type CSSProperties, type ElementType, type ReactNode } from 'react';
+import { useEffect, useId, useRef, type CSSProperties, type ElementType, type ReactNode } from 'react';
 import { X } from 'lucide-react';
 import { theme } from '../theme';
 
@@ -94,26 +94,72 @@ export function Loading({ error }: { error?: string | null }) {
     : <Empty>Loading…</Empty>;
 }
 
-export function Modal({ title, onClose, children, width = 560 }: {
-  title: string; onClose: () => void; children: ReactNode; width?: number;
+const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+// Escape closes, Tab stays inside, and focus goes back to whatever opened the dialog
+export function Modal({ title, onClose, children, width = 560, centered }: {
+  title: string; onClose: () => void; children: ReactNode; width?: number; centered?: boolean;
 }) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const closeRef = useRef(onClose);
+  const titleId = useId();
+  useEffect(() => { closeRef.current = onClose; });
+
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+    const opener = document.activeElement as HTMLElement | null;
+    const dialog = dialogRef.current;
+    dialog?.querySelector<HTMLElement>(FOCUSABLE)?.focus();
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { closeRef.current(); return; }
+      if (e.key !== 'Tab' || !dialog) return;
+      const items = [...dialog.querySelectorAll<HTMLElement>(FOCUSABLE)];
+      const first = items[0], last = items[items.length - 1];
+      if (!first) { e.preventDefault(); return; }
+      if (!dialog.contains(document.activeElement)) { e.preventDefault(); first.focus(); }
+      else if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = overflow;
+      opener?.focus();
+    };
+  }, []);
+
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(35,37,43,0.35)', zIndex: 200,
-      display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '60px 16px', overflowY: 'auto' }}>
-      <div onClick={e => e.stopPropagation()} style={{ ...card, width: '100%', maxWidth: width }}>
-        <div style={{ display: 'flex', alignItems: 'center', marginBottom: 16 }}>
-          <h2 style={{ margin: 0, fontSize: 17, flex: 1 }}>{title}</h2>
-          <button onClick={onClose} aria-label="Close" style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
+      display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: centered ? '24px 16px' : '60px 16px', overflowY: 'auto' }}>
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={titleId} onClick={e => e.stopPropagation()}
+        style={{ ...card, width: '100%', maxWidth: width, margin: centered ? 'auto' : undefined }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 16 }}>
+          <h2 id={titleId} style={{ margin: 0, fontSize: 17, flex: 1 }}>{title}</h2>
+          <button onClick={onClose} aria-label="Close" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, lineHeight: 0 }}>
             <X size={18} color={theme.colors.grey} />
           </button>
         </div>
         {children}
       </div>
+    </div>
+  );
+}
+
+const sectionHeading: CSSProperties = { margin: '0 0 6px', fontSize: 12, fontWeight: 600, color: theme.colors.grey };
+
+// Small grey heading for a section inside a modal
+export function SectionTitle({ children }: { children: ReactNode }) {
+  return <h3 style={sectionHeading}>{children}</h3>;
+}
+
+// One label/value pair inside a <dl>
+export function Detail({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div>
+      <dt style={sectionHeading}>{label}</dt>
+      <dd style={{ margin: 0 }}>{children}</dd>
     </div>
   );
 }
@@ -163,4 +209,24 @@ export function initials(name?: string | null): string {
 
 export function Grid({ cols, children, gap = theme.space.gap }: { cols: string; children: ReactNode; gap?: number }) {
   return <div className="fq-grid" style={{ display: 'grid', gridTemplateColumns: cols, gap, alignItems: 'start' }}>{children}</div>;
+}
+
+// Cards stretch to fill the row; ticket grids keep a fixed card width so one ticket doesn't fill the page
+export const cardGrid = (min: number, stretch = true) => ({
+  display: 'grid', gridTemplateColumns: `repeat(${stretch ? 'auto-fit' : 'auto-fill'}, minmax(${min}px, 1fr))`, gap: 12,
+});
+
+export function StatTile({ icon: Icon, color, label, value, hint }: { icon: ElementType; color: string; label: string; value: ReactNode; hint?: ReactNode }) {
+  return (
+    <div style={{ padding: 16, borderRadius: 16, background: color + '10', display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span style={{ width: 30, height: 30, borderRadius: 9, background: color + '22', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Icon size={15} color={color} strokeWidth={2} />
+        </span>
+        <span style={{ fontSize: 12, color: theme.colors.grey, fontWeight: 500 }}>{label}</span>
+      </div>
+      <div style={{ fontSize: 32, fontWeight: 700, lineHeight: 1, color: theme.colors.ink }}>{value}</div>
+      {hint && <div style={{ fontSize: 11, color: theme.colors.grey }}>{hint}</div>}
+    </div>
+  );
 }

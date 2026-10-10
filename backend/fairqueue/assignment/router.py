@@ -52,6 +52,17 @@ def do_assign(ticket_id: int, analyst_id: int, override_reason: str | None,
     return {"ticket": repo.get_ticket(ticket_id), "accepted": accepted, "handover": is_handover}
 
 
+@router.get("/move-impact/{ticket_id}")
+def move_impact(ticket_id: int):
+    """Reassign / support options for a risky ticket: each analyst's chance of making the
+    deadline if it moves to them, their availability, and which of their own tickets it would hurt."""
+    from fairqueue.engine.whatif import whatif_move
+    out = whatif_move(ticket_id)
+    if out is None:
+        raise HTTPException(404, "Open ticket not found")
+    return out
+
+
 @router.post("/assign")
 def assign(body: AssignRequest):
     return do_assign(body.ticket_id, body.analyst_id, body.override_reason, body.support_id, body.decided_by)

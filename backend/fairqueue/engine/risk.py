@@ -121,7 +121,7 @@ def score_all(extra_leave: dict | None = None) -> list[dict]:
             "assignee_name": ctx["analysts"].get(s.analyst_id, {}).get("name") if s.analyst_id else None,
             "p_miss": s.p_miss, "cause": cause, "explanation": sentence, "facts": facts,
             "action": ACTIONS[cause], "impact": impact, "risk_x_impact": round(s.p_miss * impact, 2),
-            "hours_needed": s.likely, "hours_available": round(s.available, 1),
+            "hours_needed": s.likely, "hours_low": s.low, "hours_high": s.high, "hours_available": round(s.available, 1),
             "expected_completion": s.finish.isoformat() if s.finish else None,
             "alert": s.p_miss >= ALERT_THRESHOLD,
         })
