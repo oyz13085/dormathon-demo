@@ -65,7 +65,7 @@ def seed(db_path: str | None = None) -> None:
     con = sqlite3.connect(path)
     cur = con.cursor()
     # Requester history tables first (they reference deliverables); recreated on first use
-    for t in ["revision_attachments", "revision_requests", "deliverable_reviews",
+    for t in ["leave_handovers", "leave_plans", "revision_attachments", "revision_requests", "deliverable_reviews",
               "agent_cache", "skill_adjustments", "fit_settings", "pairings", "deliverables",
               "feedback", "leave", "priority_changes", "assignments", "tickets", "analysts"]:
         cur.execute(f"DROP TABLE IF EXISTS {t}")

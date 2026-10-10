@@ -7,6 +7,7 @@ from fairqueue.lifecycle.router import router as lifecycle, deliverables_router,
 from fairqueue.planning.router import router as planning
 from fairqueue.prediction.router import router as prediction
 from fairqueue.requester.router import router as requester
+from fairqueue.leave_advisor.router import router as leave_advisor
 
 
 @asynccontextmanager
@@ -41,6 +42,7 @@ app.include_router(prediction, prefix="/prediction", tags=["prediction"])
 app.include_router(assignment, prefix="/assignment", tags=["assignment"])
 app.include_router(planning, prefix="/planning", tags=["planning"])
 app.include_router(requester, prefix="/requester", tags=["requester"])
+app.include_router(leave_advisor, prefix="/leave-advisor", tags=["leave advisor"])
 
 
 @app.get("/health")
