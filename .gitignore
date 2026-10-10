@@ -12,3 +12,4 @@ backend/artifacts/
 .claude/
 .history/
 *.log
+dormathon-demo/
