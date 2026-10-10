@@ -55,31 +55,24 @@ def summary(role: str = Query("lead"), user: str | None = None, division: str | 
 @router.post("/suggest")
 def suggest(body: SuggestRequest):
     """AI suggestions shown on the request form: category, priority with a KPI-based reason,
-    estimated hours, a recommended assignee (high-confidence types only) and similar past work."""
-    from fairqueue.llm import extract_category, suggest_priority
-    from fairqueue.models.hours import known_categories, predict_hours
-    from fairqueue.engine.fit import recommend
-
-    cat = extract_category(body.title, body.description or "", known_categories())
-    pri = suggest_priority(body.title, body.description or "", body.division, body.deadline)
-    hours = predict_hours(cat["category"], pri["priority"], body.division)
-    confidence = "Low" if "Low" in (cat["confidence"], hours["confidence"]) else "High"
-    draft = {"id": None, "title": body.title, "division": body.division, "requester": body.requester,
-             "category": cat["category"], "priority": pri["priority"], "deadline": body.deadline,
-             "pred_low": hours["low"], "pred_likely": hours["likely"], "pred_high": hours["high"],
-             "confidence": confidence, "status": "Unassigned"}
-    card = recommend(draft)
-    return {"category": cat["category"], "category_method": cat["method"], "confidence": confidence,
-            "priority": pri["priority"], "priority_reason": pri["reason"], "priority_method": pri["method"],
-            "hours": {k: hours[k] for k in ("low", "likely", "high", "method")},
-            "recommendation": _requester_card(card),
-            "similar_work": views.similar_work(body.title, body.description, cat["category"])}
+    estimated hours, a recommended assignee (high-confidence types only) and similar past work.
+    Built by the suggest agent (agents/suggest.py): a real tool-calling loop with an API key,
+    the same tools in fixed order without one."""
+    from agents.suggest import run
+    s = run(body.title, body.deadline, body.description or "", body.requester)
+    return {"division": s["division"], "division_method": s["division_method"],
+            "category": s["category"], "category_method": s["category_method"], "confidence": s["confidence"],
+            "priority": s["priority"], "priority_reason": s["priority_reason"], "priority_method": s["priority_method"],
+            "hours": s["hours"],
+            "recommendation": _requester_card(s["card"]),
+            "similar_work": s["similar_work"]}
 
 
 def _requester_card(card: dict) -> dict:
     """What the person deciding the assignment sees: names, fit and the one-line reason."""
-    keep = ("analyst_id", "name", "fit", "explanation", "low_confidence")
-    pick = lambda c: {k: c[k] for k in keep} if c else None
+    keep = ("analyst_id", "name", "fit", "explanation", "low_confidence",
+            "breakdown", "free_hours", "open_hours", "past_in_category", "past_with_requester")
+    pick = lambda c: {k: c[k] for k in keep if k in c} if c else None
     return {"decision": card["decision"], "note": card.get("note"), "explanation": card.get("explanation"),
             "recommended": pick(card.get("recommended")), "usual_partner": pick(card.get("usual_partner")),
             "support": pick(card.get("support"))}

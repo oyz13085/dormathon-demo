@@ -9,4 +9,6 @@ pydantic
 python-dotenv
 pyyaml
 anthropic
+google-genai
+openai
 groq

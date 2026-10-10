@@ -55,13 +55,13 @@ def meta():
     """Everything the role switcher and forms need."""
     from fairqueue.config import DEPARTMENTS, LLM, ALERT_THRESHOLD, ALERTS_PER_DAY
     from fairqueue.db import repo
-    from fairqueue.llm import _get_client
+    from fairqueue.llm import llm_enabled
     from fairqueue.models.hours import known_categories
     return {"departments": DEPARTMENTS, "categories": known_categories(),
             "analysts": [{"id": a["id"], "name": a["name"], "role_title": a.get("role_title")}
                          for a in repo.get_analysts()],
             "requesters": repo.get_requesters(),
-            "llm": {"model": LLM["model"], "enabled": _get_client() is not None},
+            "llm": {"model": LLM["model"], "enabled": llm_enabled()},
             "alerts": {"threshold": ALERT_THRESHOLD, "max_per_day": ALERTS_PER_DAY}}
 
 
