@@ -5,6 +5,8 @@ uploads/
 __pycache__/
 *.pyc
 .env
+*.env
+ignore/
 node_modules/
 web/dist/
 .ipynb_checkpoints/
@@ -13,3 +15,4 @@ backend/artifacts/
 .history/
 *.log
 dormathon-demo/
+.playwright-mcp/

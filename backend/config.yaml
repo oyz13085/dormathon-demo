@@ -1,8 +1,8 @@
 # FairQueue configuration. Change values here, not in code.
 
 llm:
-  provider: anthropic
-  model: claude-opus-5-5        # swap freely; any Claude model id works
+  provider: groq                      # anthropic | gemini | groq (needs that API key, else rule-based)
+  model: openai/gpt-oss-120b           # gemini: gemini-3.8-flash; anthropic: claude-opus-5-5
   effort: low                   # short classification-style calls
   timeout_seconds: 8            # beyond this the rule-based fallback is used
   max_tokens: 1024

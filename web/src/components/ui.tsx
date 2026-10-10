@@ -1,5 +1,4 @@
-import { useEffect } from 'react';
-import type { CSSProperties, ElementType, ReactNode } from 'react';
+import { useEffect, useId, useRef, type CSSProperties, type ElementType, type ReactNode } from 'react';
 import { X } from 'lucide-react';
 import { theme } from '../theme';
 
@@ -95,26 +94,72 @@ export function Loading({ error }: { error?: string | null }) {
     : <Empty>Loading…</Empty>;
 }
 
-export function Modal({ title, onClose, children, width = 560 }: {
-  title: string; onClose: () => void; children: ReactNode; width?: number;
+const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+// Escape closes, Tab stays inside, and focus goes back to whatever opened the dialog
+export function Modal({ title, onClose, children, width = 560, centered }: {
+  title: string; onClose: () => void; children: ReactNode; width?: number; centered?: boolean;
 }) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const closeRef = useRef(onClose);
+  const titleId = useId();
+  useEffect(() => { closeRef.current = onClose; });
+
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+    const opener = document.activeElement as HTMLElement | null;
+    const dialog = dialogRef.current;
+    dialog?.querySelector<HTMLElement>(FOCUSABLE)?.focus();
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { closeRef.current(); return; }
+      if (e.key !== 'Tab' || !dialog) return;
+      const items = [...dialog.querySelectorAll<HTMLElement>(FOCUSABLE)];
+      const first = items[0], last = items[items.length - 1];
+      if (!first) { e.preventDefault(); return; }
+      if (!dialog.contains(document.activeElement)) { e.preventDefault(); first.focus(); }
+      else if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = overflow;
+      opener?.focus();
+    };
+  }, []);
+
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(35,37,43,0.35)', zIndex: 200,
-      display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '60px 16px', overflowY: 'auto' }}>
-      <div onClick={e => e.stopPropagation()} style={{ ...card, width: '100%', maxWidth: width }}>
-        <div style={{ display: 'flex', alignItems: 'center', marginBottom: 16 }}>
-          <h2 style={{ margin: 0, fontSize: 17, flex: 1 }}>{title}</h2>
-          <button onClick={onClose} aria-label="Close" style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
+      display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: centered ? '24px 16px' : '60px 16px', overflowY: 'auto' }}>
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={titleId} onClick={e => e.stopPropagation()}
+        style={{ ...card, width: '100%', maxWidth: width, margin: centered ? 'auto' : undefined }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 16 }}>
+          <h2 id={titleId} style={{ margin: 0, fontSize: 17, flex: 1 }}>{title}</h2>
+          <button onClick={onClose} aria-label="Close" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, lineHeight: 0 }}>
             <X size={18} color={theme.colors.grey} />
           </button>
         </div>
         {children}
       </div>
+    </div>
+  );
+}
+
+const sectionHeading: CSSProperties = { margin: '0 0 6px', fontSize: 12, fontWeight: 600, color: theme.colors.grey };
+
+// Small grey heading for a section inside a modal
+export function SectionTitle({ children }: { children: ReactNode }) {
+  return <h3 style={sectionHeading}>{children}</h3>;
+}
+
+// One label/value pair inside a <dl>
+export function Detail({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div>
+      <dt style={sectionHeading}>{label}</dt>
+      <dd style={{ margin: 0 }}>{children}</dd>
     </div>
   );
 }

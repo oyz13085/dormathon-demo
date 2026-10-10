@@ -1,12 +1,12 @@
 import { useState, type ReactNode } from 'react';
-import { Search, Paperclip, AlertCircle } from 'lucide-react';
+import { Paperclip, AlertCircle } from 'lucide-react';
 import { theme } from '../theme';
 import type { Ticket } from '../api/types';
 import { StatusPill } from './StatusPill';
 import { DepartmentChip } from './DepartmentChip';
+import { TicketFilters } from './TicketFilters';
+import { filterTickets, type TicketTab } from './tickets';
 import { Empty, PRIORITY_COLOR, RiskBadge, fmtDate, hours, initials } from './ui';
-
-type Tab = 'All' | 'Open' | 'Unassigned' | 'In progress' | 'Waiting' | 'Closed';
 
 interface Props {
   tickets: Ticket[];
@@ -16,19 +16,15 @@ interface Props {
   actions?: (t: Ticket) => ReactNode;
   onSelect?: (t: Ticket) => void;
   selectedId?: number | null;
-  tabs?: Tab[];
+  tabs?: TicketTab[];
 }
 
 export function TicketTable({ tickets, showPredictions, showAssignee = true, showExpected, actions, onSelect,
   selectedId, tabs = ['All', 'Open', 'Unassigned', 'In progress', 'Waiting', 'Closed'] }: Props) {
-  const [tab, setTab] = useState<Tab>(tabs[0]);
+  const [tab, setTab] = useState<TicketTab>(tabs[0]);
   const [search, setSearch] = useState('');
 
-  const filtered = tickets
-    .filter(t => tab === 'All' || (tab === 'Open' ? t.status !== 'Closed'
-      : tab === 'Unassigned' ? (!t.assignee_id && t.status !== 'Closed') : t.status === tab))
-    .filter(t => `${t.title} ${t.division} ${t.requester} ${t.assignee_name ?? ''}`.toLowerCase()
-      .includes(search.toLowerCase()));
+  const filtered = filterTickets(tickets, tab, search);
 
   const head = ['ID', 'Title', 'Dept', 'Priority', 'Status',
     ...(showAssignee ? ['Assignee'] : []),
@@ -39,23 +35,7 @@ export function TicketTable({ tickets, showPredictions, showAssignee = true, sho
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-        {tabs.map(t => (
-          <button key={t} onClick={() => setTab(t)} style={{
-            padding: '5px 14px', borderRadius: theme.radius.pill, border: 'none', cursor: 'pointer',
-            fontSize: 13, fontWeight: 600,
-            background: tab === t ? theme.colors.ink : theme.colors.track,
-            color: tab === t ? '#fff' : theme.colors.grey,
-          }}>{t}</button>
-        ))}
-        <div style={{ marginLeft: 'auto', position: 'relative' }}>
-          <Search size={14} color={theme.colors.grey} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)' }} />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search tickets…" style={{
-            paddingLeft: 32, paddingRight: 12, paddingTop: 6, paddingBottom: 6, borderRadius: theme.radius.pill,
-            border: `1.5px solid ${theme.colors.track}`, fontSize: 13, outline: 'none', background: theme.colors.card, width: 200,
-          }} />
-        </div>
-      </div>
+      <TicketFilters tabs={tabs} tab={tab} onTab={setTab} search={search} onSearch={setSearch} />
 
       <div style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>

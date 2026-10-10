@@ -56,6 +56,43 @@ body {
   .fq-grid { grid-template-columns: 1fr !important; }
 }
 
+/* Ticket cards: columns follow the space the grid actually has, not the window */
+.fq-ticket-grid-wrap { container-type: inline-size; }
+.fq-ticket-grid { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); }
+@container (min-width: 560px) { .fq-ticket-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@container (min-width: 900px) { .fq-ticket-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+
+.fq-ticket-card {
+  background: var(--color-card);
+  border: 1px solid var(--color-track);
+  border-radius: 16px;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.fq-ticket-card:hover { border-color: #C47A5780; box-shadow: 0 2px 12px rgba(35, 37, 43, 0.07); }
+.fq-ticket-card:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+
+/* Reasoning-panel thinking spinner (slow, stops under reduced motion) */
+@keyframes fq-spin { to { transform: rotate(360deg); } }
+.fq-spin { animation: fq-spin 2.4s linear infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .fq-spin { animation: none; }
+}
+
+/* Indeterminate loading bar: segment slides back and forth */
+@keyframes fq-loadslide {
+  0% { left: -40%; }
+  100% { left: 100%; }
+}
+.fq-loadbar { position: relative; height: 3px; border-radius: 99px; background: var(--color-track); overflow: hidden; }
+.fq-loadbar > div { position: absolute; top: 0; bottom: 0; width: 40%; border-radius: 99px;
+  background: var(--color-accent); animation: fq-loadslide 1.2s ease-in-out infinite alternate; }
+@media (prefers-reduced-motion: reduce) {
+  .fq-loadbar > div { animation: none; left: 0; width: 100%; }
+}
+
+/* Right-column tiles: the last tile absorbs leftover height so the column matches the form */
+.rq-tiles > :last-child { flex: 1; }
+
 /* Clickable cards: a small lift on hover */
 .fq-lift { transition: transform .12s ease, box-shadow .12s ease; }
 .fq-lift:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(35,37,43,0.10) !important; }

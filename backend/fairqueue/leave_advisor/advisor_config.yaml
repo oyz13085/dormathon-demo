@@ -1,0 +1,39 @@
+# Leave Impact & Handover Advisor settings. Change values here, not in code.
+
+calendar:
+  country: MY
+  locations: [Selangor, Kuala Lumpur]   # the analysts' working locations
+  # Public holidays are only used once someone has checked them against the official gazette and set
+  # verified: true. Until then the advisor counts working weekdays only and says "Public holidays not configured".
+  verified: false
+  source: ""                            # e.g. the gazette or JPA page the dates were checked against
+  holidays: []
+  # Format, one entry per holiday:
+  #   - {date: "YYYY-MM-DD", name: "Holiday name", locations: [all]}            # nationwide
+  #   - {date: "YYYY-MM-DD", name: "Holiday name", locations: [Selangor]}       # state holiday
+
+after_return_working_days: 5
+
+# Rule-based suitability score (0–100) shown with each suggested replacement. Permitted parts only: no track
+# record, revision or rejection rates, estimate accuracy or partnership scores. Not produced by the AI.
+suitability_weights:
+  skills: 0.25        # lists the ticket type as a skill (plus any skill change the Team Lead approved)
+  experience: 0.25    # closed tickets of this type, relative to the most experienced colleague
+  domain: 0.10        # closed tickets for the requesting department, relative to the most familiar colleague
+  capacity: 0.20      # working time free before the deadline (after earlier-deadline work) against the handover
+  deadline: 0.20      # estimated chance of meeting the deadline with the ticket in their queue            # "shortly after returning" = due within this many working days of coming back
+
+# AI handover agent: Groq (key in backend/.env as GROQ_API_KEY). Used by the leave advisor only.
+ai:
+  enabled: true
+  provider: groq
+  # Must support tool use and strict structured outputs on Groq (see console.groq.com/docs/structured-outputs).
+  # openai/gpt-oss-120b: strongest of those, one tool call at a time. qwen/qwen3.8-27b: also calls tools in parallel.
+  model: openai/gpt-oss-120b
+  timeout_seconds: 30        # per API request; the SDK doesn't retry (max_retries=0)
+  max_tool_rounds: 1         # tool-use requests before the final answer; then one final structured request
+                             # (eligible colleagues' records are pre-loaded, so tools are only for combined checks;
+                             #  Groq's free tier allows 8,000 tokens a minute, so keep this low)
+  reasoning_effort: low      # gpt-oss reasoning depth on Groq; fewer tokens per request. Remove for other models
+  max_completion_tokens: 2000
+  cache_ttl_seconds: 600     # same analyst, dates and data within this window reuse the last answer

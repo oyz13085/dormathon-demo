@@ -135,6 +135,8 @@ export interface RecommendationCard {
 }
 
 export interface Suggestion {
+  division: Dept;
+  division_method: "llm" | "rule-based";
   category: string;
   category_method: string;
   confidence: "High" | "Low";
@@ -146,7 +148,7 @@ export interface Suggestion {
     decision: RecommendationCard["decision"];
     note?: string;
     explanation?: string;
-    recommended: Pick<Candidate, "analyst_id" | "name" | "fit" | "explanation" | "low_confidence"> | null;
+    recommended: Pick<Candidate, "analyst_id" | "name" | "fit" | "explanation" | "low_confidence" | "breakdown" | "free_hours" | "open_hours" | "past_in_category" | "past_with_requester"> | null;
     usual_partner: Pick<Candidate, "analyst_id" | "name" | "fit" | "explanation" | "low_confidence"> | null;
     support: Pick<Candidate, "analyst_id" | "name" | "fit" | "explanation" | "low_confidence"> | null;
   };
