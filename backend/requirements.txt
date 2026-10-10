@@ -11,3 +11,4 @@ pyyaml
 anthropic
 google-genai
 openai
+groq

@@ -5,6 +5,7 @@ import type { Deliverable, Feedback, SkillAdjustment } from '../../api/types';
 import { useApi, useSession } from '../../session';
 import { Paperclip } from 'lucide-react';
 import { Button, Card, Empty, Field, Grid, Loading, Modal, Notice, Pill, Table, fmtDate, inputStyle, td } from '../../components/ui';
+import { RevisionDetailsModal } from '../../components/RevisionDetailsModal';
 
 export default function MyWork() {
   const { user, analystId, meta } = useSession();
@@ -14,6 +15,7 @@ export default function MyWork() {
   const [category, setCategory] = useState('');
   const [reason, setReason] = useState('');
   const [msg, setMsg] = useState<string | null>(null);
+  const [revisionFor, setRevisionFor] = useState<Deliverable | null>(null);
 
   async function flag() {
     try {
@@ -31,7 +33,7 @@ export default function MyWork() {
         {!work.data ? <Loading error={work.error} /> : work.data.length === 0 ? <Empty>Nothing delivered yet.</Empty> : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 300px), 1fr))', gap: 12 }}>
             {work.data.map(d => (
-              <WorkTile key={d.id} d={d}
+              <WorkTile key={d.id} d={d} onViewRevision={() => setRevisionFor(d)}
                 actualHours={(feedback.data ?? []).find(f => f.ticket_id === d.ticket_id)?.actual_hours} />
             ))}
           </div>
@@ -77,6 +79,7 @@ export default function MyWork() {
           </div>
         </Card>
       </div>
+      {revisionFor && <RevisionDetailsModal deliverable={revisionFor} user={user} onClose={() => setRevisionFor(null)} />}
     </Grid>
   );
 }
@@ -87,7 +90,7 @@ function attachmentLabel(d: Deliverable): string {
   return 'No attachments';
 }
 
-function WorkTile({ d, actualHours }: { d: Deliverable; actualHours?: number | null }) {
+function WorkTile({ d, actualHours, onViewRevision }: { d: Deliverable; actualHours?: number | null; onViewRevision: () => void }) {
   const [show, setShow] = useState(false);
   const [hover, setHover] = useState(false);
   return (
@@ -154,6 +157,11 @@ function WorkTile({ d, actualHours }: { d: Deliverable; actualHours?: number | n
                 </p>
               )}
               <p style={{ margin: 0, color: theme.colors.ink }}>{d.revision_note ?? 'No note left.'}</p>
+              {d.requester_rating === 'Needs revision' && (
+                <div style={{ marginTop: 10 }}>
+                  <Button small variant="outline" onClick={() => { setShow(false); onViewRevision(); }}>View Revision Details</Button>
+                </div>
+              )}
             </div>
           </div>
         </Modal>
