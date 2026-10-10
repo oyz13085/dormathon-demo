@@ -62,28 +62,14 @@ export function LeaveCalendar({ events, onSelectEvent }: Props) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-      {/* Legend + view pills */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
-          {Object.entries(ANALYST_COLORS).map(([name, color]) => (
-            <span key={name} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: theme.colors.grey }}>
-              <span style={{ width: 10, height: 10, borderRadius: 3, background: color }} />
-              {name}
-            </span>
-          ))}
-        </div>
-        <div style={{ display: 'flex', gap: 6 }}>
-          {(['month', 'week'] as const).map(v => (
-            <button key={v} onClick={() => setView(v)} style={{
-              padding: '4px 14px', borderRadius: theme.radius.pill, border: 'none', cursor: 'pointer',
-              fontSize: 12, fontWeight: 600, textTransform: 'capitalize',
-              background: view === v ? theme.colors.ink : theme.colors.track,
-              color: view === v ? '#fff' : theme.colors.grey,
-            }}>
-              {v}
-            </button>
-          ))}
-        </div>
+      {/* Legend (Month/Week switching is in the calendar's own toolbar) */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+        {Object.entries(ANALYST_COLORS).map(([name, color]) => (
+          <span key={name} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: theme.colors.grey }}>
+            <span style={{ width: 10, height: 10, borderRadius: 3, background: color }} />
+            {name}
+          </span>
+        ))}
       </div>
 
       <div style={{ '--rbc-today-highlight': theme.colors.accent + '18' } as React.CSSProperties}>

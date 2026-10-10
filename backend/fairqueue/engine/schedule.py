@@ -33,9 +33,12 @@ def daterange(start: date, end: date):
         d += timedelta(days=1)
 
 
-def leave_days(analyst_id: int, extra: list[tuple[str, str]] | None = None) -> set[date]:
+def leave_days(analyst_id: int, extra: list[tuple[str, str]] | None = None,
+               ignore_leave_id: int | None = None) -> set[date]:
     days: set[date] = set()
     for l in repo.get_leave(analyst_id=analyst_id, status="Approved"):
+        if l["id"] == ignore_leave_id:
+            continue
         days.update(daterange(parse_day(l["start_date"]), parse_day(l["end_date"])))
     for s, e in extra or []:
         days.update(daterange(parse_day(s), parse_day(e)))
@@ -102,12 +105,12 @@ def ticket_hours(t: dict, handovers: int = 0) -> tuple[float, float, float, floa
 
 def analyst_queue(analyst_id: int, extra_leave: list[tuple[str, str]] | None = None,
                   extra_ticket: dict | None = None, exclude: set[int] | None = None,
-                  today: date | None = None) -> list[Slot]:
+                  today: date | None = None, ignore_leave_id: int | None = None) -> list[Slot]:
     """Schedule one analyst's open tickets (plus an optional hypothetical one)."""
     today = today or date.today()
     analyst = repo.get_analyst(analyst_id) or {}
     per_day = float(analyst.get("weekly_hours") or 40) / 5
-    off = leave_days(analyst_id, extra_leave)
+    off = leave_days(analyst_id, extra_leave, ignore_leave_id)
     off_no_leave: set[date] = set()
     handovers = repo.handover_counts()
 

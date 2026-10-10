@@ -13,9 +13,11 @@ from fairqueue.engine import schedule
 from fairqueue.engine.fit import candidates
 
 
-def whatif_leave(analyst_id: int, start_date: str, end_date: str) -> dict:
+def whatif_leave(analyst_id: int, start_date: str, end_date: str, leave_id: int | None = None) -> dict:
+    """leave_id: an already-approved leave being checked, compared against the plan without it,
+    so its tickets that still need cover keep showing after approval."""
     analyst = repo.get_analyst(analyst_id) or {"name": f"Analyst {analyst_id}"}
-    before = {s.ticket_id: s for s in schedule.analyst_queue(analyst_id)}
+    before = {s.ticket_id: s for s in schedule.analyst_queue(analyst_id, ignore_leave_id=leave_id)}
     after = schedule.analyst_queue(analyst_id, extra_leave=[(start_date, end_date)])
     tickets = {t["id"]: t for t in repo.get_tickets(assignee_id=analyst_id)}
 
@@ -23,6 +25,8 @@ def whatif_leave(analyst_id: int, start_date: str, end_date: str) -> dict:
     for s in after:
         b = before.get(s.ticket_id)
         t = tickets[s.ticket_id]
+        if schedule.parse_day(t["deadline"]) < schedule.parse_day(start_date):
+            continue                       # due before the leave starts: not affected
         crossed = s.p_miss >= ALERT_THRESHOLD and (b is None or b.p_miss < ALERT_THRESHOLD or s.p_miss - b.p_miss >= 0.2)
         row = {"ticket_id": s.ticket_id, "title": t["title"], "division": t["division"],
                "priority": t["priority"], "deadline": t["deadline"],

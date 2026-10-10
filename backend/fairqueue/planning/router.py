@@ -1,5 +1,6 @@
 """Volume forecast, leave requests and the what-if check."""
 from __future__ import annotations
+from datetime import date
 from fastapi import APIRouter, HTTPException, Query
 from fairqueue import views
 from fairqueue.contracts import LeaveDecision, LeaveIn
@@ -22,14 +23,18 @@ def whatif(analyst_id: int, start_date: str, end_date: str):
 
 @router.get("/leave")
 def list_leave(role: str = Query("lead"), user: str | None = None, status: str | None = None):
-    """Lead: every request, with the what-if result attached to pending ones. Analyst: own requests."""
+    """Lead: every request. Pending and upcoming approved leave get the what-if result attached,
+    so the lead can see (and reassign) the tickets that need cover. Analyst: own requests."""
     if role == "analyst":
         return repo.get_leave(analyst_id=views.analyst_id_for(user), status=status)
     views.require(role, "lead")
     rows = repo.get_leave(status=status)
+    today = date.today().isoformat()
     for l in rows:
         if l["status"] == "Requested":
             l["whatif"] = whatif_leave(l["analyst_id"], l["start_date"], l["end_date"])
+        elif l["status"] == "Approved" and l["end_date"] >= today:
+            l["whatif"] = whatif_leave(l["analyst_id"], l["start_date"], l["end_date"], leave_id=l["id"])
     return rows
 
 
