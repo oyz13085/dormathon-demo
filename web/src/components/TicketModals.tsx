@@ -285,12 +285,12 @@ const VERDICT: Record<MoveOption['verdict'], { label: string; color: string }> =
 const pct = (p: number) => `${Math.round(p * 100)}%`;
 
 /** Risk ticket window: why it's at risk, and who could take it or help, with the knock-on effect on their queue. */
-export function RiskActionModal({ risk, onClose }: { risk: RiskItem; onClose: () => void }) {
+export function RiskActionModal({ risk, defaultReason, onClose }: { risk: RiskItem; defaultReason?: string; onClose: () => void }) {
   const { refresh } = useSession();
   const { data, error } = useApi<MoveImpact>(`/assignment/move-impact/${risk.ticket_id}`);
   const [mode, setMode] = useState<'reassign' | 'support'>('reassign');
   const [picked, setPicked] = useState<number | null>(null);
-  const [reason, setReason] = useState('');
+  const [reason, setReason] = useState(defaultReason ?? '');
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
   const option = data?.options.find(o => o.analyst_id === picked) ?? null;

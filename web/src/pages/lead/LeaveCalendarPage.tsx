@@ -2,16 +2,17 @@ import { useState } from 'react';
 import { Check, X, CalendarDays, Users, FlaskConical } from 'lucide-react';
 import { theme } from '../../theme';
 import { api, qs } from '../../api/client';
-import type { Leave, Meta, WhatIf } from '../../api/types';
+import type { Leave, Meta, RiskItem, WhatIf } from '../../api/types';
 import { useApi, useSession } from '../../session';
 import { LeaveCalendar, ANALYST_COLORS, type LeaveEvent } from '../../components/LeaveCalendar';
-import { ReassignDialog } from '../../components/ReassignDialog';
+import { RiskActionModal } from '../../components/TicketModals';
 import { Button, Card, Empty, Field, Grid, Loading, Notice, Pill, RiskBadge, Table, fmtDate, initials, inputStyle, td } from '../../components/ui';
 
 type Broken = WhatIf['broken'][number];
-interface Reassigning { ticketId: number; title: string; fromName: string; suggestedId: number | null; reason: string }
+interface Reassigning { risk: RiskItem; reason: string }
 
 const today = () => new Date().toISOString().slice(0, 10);
+const pct = (p: number | null) => p == null ? '—' : `${Math.round(p * 100)}%`;
 
 function toEvent(l: Leave): LeaveEvent {
   const end = new Date(`${l.end_date}T00:00:00`);
@@ -88,6 +89,7 @@ export default function LeaveCalendarPage() {
   const [msg, setMsg] = useState<string | null>(null);
   const [focus, setFocus] = useState<number | null>(null);
   const [reassigning, setReassigning] = useState<Reassigning | null>(null);
+  const [openError, setOpenError] = useState<string | null>(null);
 
   const all = leave.data ?? [];
   const pending = all.filter(l => l.status === 'Requested');
@@ -101,8 +103,17 @@ export default function LeaveCalendarPage() {
     refresh();
   }
 
-  function openReassign(fromName: string, b: Broken, reason: string) {
-    setReassigning({ ticketId: b.ticket_id, title: b.title, fromName, suggestedId: b.takeover?.analyst_id ?? null, reason });
+  // The ticket's risk in today's plan, restated with the leave counted, so the dialog shows the with-leave numbers
+  async function openReassign(fromName: string, b: Broken, reason: string) {
+    setOpenError(null);
+    try {
+      const r = await api.get<RiskItem>(`/prediction/risk/${b.ticket_id}`);
+      setReassigning({ reason, risk: {
+        ...r, p_miss: b.p_miss_after, cause: 'Leave conflict', action: 'Reassign before the leave starts',
+        explanation: `With ${fromName}'s leave, the chance of missing ${fmtDate(b.deadline)} goes from ${pct(b.p_miss_before)} to ${pct(b.p_miss_after)}.`,
+        facts: [], hours_available: b.hours_available_after ?? r.hours_available, expected_completion: null,
+      } });
+    } catch (e) { setOpenError((e as Error).message); }
   }
 
   function jumpTo(id: number) {
@@ -128,6 +139,7 @@ export default function LeaveCalendarPage() {
       </Card>
 
       {msg && <Notice tone="ok">{msg}</Notice>}
+      {openError && <Notice tone="error">{openError}</Notice>}
 
       <Grid cols="minmax(0,1.6fr) minmax(0,1fr)">
         <Card title="Leave and tickets needing cover" icon={Users} iconColor={theme.colors.sand}>
@@ -155,10 +167,7 @@ export default function LeaveCalendarPage() {
       </Grid>
 
       {reassigning && (
-        <ReassignDialog ticketId={reassigning.ticketId} title={reassigning.title} fromName={reassigning.fromName}
-          suggestedId={reassigning.suggestedId} defaultReason={reassigning.reason}
-          onClose={() => setReassigning(null)}
-          onDone={m => { setReassigning(null); setMsg(m); refresh(); }} />
+        <RiskActionModal risk={reassigning.risk} defaultReason={reassigning.reason} onClose={() => setReassigning(null)} />
       )}
     </div>
   );

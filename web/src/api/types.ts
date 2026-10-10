@@ -195,7 +195,7 @@ export interface WhatIf {
   summary: string;
   broken: {
     ticket_id: number; title: string; division: Dept; priority: Priority; deadline: string;
-    p_miss_before: number | null; p_miss_after: number; hours: number;
+    p_miss_before: number | null; p_miss_after: number; hours: number; hours_available_after?: number;
     takeover: { analyst_id: number; name: string; fit: number; p_miss_if_moved: number; explanation: string } | null;
   }[];
   unaffected: { ticket_id: number; title: string; deadline: string; p_miss_after: number }[];
