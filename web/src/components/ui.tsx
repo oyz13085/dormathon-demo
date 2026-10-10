@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import type { CSSProperties, ElementType, ReactNode } from 'react';
 import { X } from 'lucide-react';
 import { theme } from '../theme';
@@ -97,6 +98,11 @@ export function Loading({ error }: { error?: string | null }) {
 export function Modal({ title, onClose, children, width = 560 }: {
   title: string; onClose: () => void; children: ReactNode; width?: number;
 }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(35,37,43,0.35)', zIndex: 200,
       display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '60px 16px', overflowY: 'auto' }}>
@@ -158,4 +164,24 @@ export function initials(name?: string | null): string {
 
 export function Grid({ cols, children, gap = theme.space.gap }: { cols: string; children: ReactNode; gap?: number }) {
   return <div className="fq-grid" style={{ display: 'grid', gridTemplateColumns: cols, gap, alignItems: 'start' }}>{children}</div>;
+}
+
+// Cards stretch to fill the row; ticket grids keep a fixed card width so one ticket doesn't fill the page
+export const cardGrid = (min: number, stretch = true) => ({
+  display: 'grid', gridTemplateColumns: `repeat(${stretch ? 'auto-fit' : 'auto-fill'}, minmax(${min}px, 1fr))`, gap: 12,
+});
+
+export function StatTile({ icon: Icon, color, label, value, hint }: { icon: ElementType; color: string; label: string; value: ReactNode; hint?: ReactNode }) {
+  return (
+    <div style={{ padding: 16, borderRadius: 16, background: color + '10', display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span style={{ width: 30, height: 30, borderRadius: 9, background: color + '22', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Icon size={15} color={color} strokeWidth={2} />
+        </span>
+        <span style={{ fontSize: 12, color: theme.colors.grey, fontWeight: 500 }}>{label}</span>
+      </div>
+      <div style={{ fontSize: 32, fontWeight: 700, lineHeight: 1, color: theme.colors.ink }}>{value}</div>
+      {hint && <div style={{ fontSize: 11, color: theme.colors.grey }}>{hint}</div>}
+    </div>
+  );
 }

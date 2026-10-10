@@ -73,7 +73,7 @@ def _capacity(wk: date) -> float:
     return total
 
 
-def forecast(n_weeks: int = 2, division: str | None = None) -> dict:
+def forecast(n_weeks: int = 2, division: str | None = None, history_weeks: int = 0) -> dict:
     hist = _weekly_history()
     models = {d: _dept_model(hist[d], d) for d in DEPARTMENTS}
     open_t = [t for t in repo.get_tickets() if t["status"] != "Closed"]
@@ -110,7 +110,12 @@ def forecast(n_weeks: int = 2, division: str | None = None) -> dict:
         weeks.append({"week_start": wk.isoformat(), "label": label, "demand_hours": demand,
                       "capacity_hours": cap, "over_capacity": demand > cap,
                       "departments": depts, "spikes": spikes, "message": msg})
-    return {"weeks": weeks, "method": "seasonal baseline from last 12 weeks per department"}
+    history = []
+    for i in range(history_weeks, 0, -1):     # actual hours of past weeks, oldest first
+        wk = week_start(today) - timedelta(weeks=i)
+        history.append({"week_start": wk.isoformat(), "label": f"Week of {wk.strftime('%d %b')}",
+                        "departments": {d: round(hist[d].get(wk, 0)) for d in DEPARTMENTS}})
+    return {"weeks": weeks, "history": history, "method": "seasonal baseline from last 12 weeks per department"}
 
 
 def spike_divisions() -> dict[str, str]:
