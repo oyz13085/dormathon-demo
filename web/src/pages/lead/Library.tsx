@@ -6,6 +6,7 @@ import { api, qs } from '../../api/client';
 import type { Deliverable, Dept, Feedback, Ticket } from '../../api/types';
 import { useApi, useSession } from '../../session';
 import { DepartmentChip } from '../../components/DepartmentChip';
+import { ANALYST_COLORS } from '../../components/LeaveCalendar';
 import { Button, Empty, Loading, Modal, Pill, card, fmtDate, initials, inputStyle } from '../../components/ui';
 
 interface RevisionRow { category: string; delivered: number; revisions: number }
@@ -95,62 +96,67 @@ function kindLabel(d: Deliverable): string {
   return d.kind === 'File' ? `#${(d.file_type ?? 'file').toUpperCase()}` : d.kind === 'Link' ? '#Link' : '#No deliverable';
 }
 
+const RATING: Record<string, { label: string; color: string }> = {
+  Useful: { label: 'Useful', color: theme.colors.sage },
+  'Needs revision': { label: 'Needs revision', color: theme.colors.red },
+  none: { label: 'Awaiting rating', color: theme.colors.grey },
+};
+
 function DeliverableCard({ d, onOpen }: { d: Deliverable; onOpen: () => void }) {
-  const KindIcon = d.kind === 'File' ? FileText : d.kind === 'Link' ? Link2 : MessageSquare;
-  const revision = d.requester_rating === 'Needs revision';
+  const r = RATING[d.requester_rating ?? 'none'];
+  const deptText = d.division === 'IT' || d.division === 'Marketing' ? theme.colors.ink : theme.dept[d.division];
+  const meta = { display: 'inline-flex', alignItems: 'center', gap: 4 } as const;
   return (
     <button onClick={onOpen} className="fq-lift" style={{
       textAlign: 'left', font: 'inherit', color: 'inherit', cursor: 'pointer', width: '100%',
-      background: tint(d.division), border: `1px solid ${edge(d.division)}`, borderRadius: 18, padding: 16,
-      display: 'flex', flexDirection: 'column', gap: 10, minHeight: 250,
+      background: theme.colors.card, border: `1px solid ${theme.colors.track}`, borderRadius: 14, padding: 14,
+      display: 'flex', flexDirection: 'column', gap: 10,
     }}>
-      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-        <Tag>#{d.category}</Tag>
-        <Tag>{kindLabel(d)}</Tag>
+      {/* Status */}
+      <div style={{ display: 'flex', alignItems: 'center' }}>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '3px 9px', borderRadius: 6,
+          background: r.color + '14', color: r.color, fontSize: 11, fontWeight: 600 }}>
+          <span style={{ width: 6, height: 6, borderRadius: '50%', background: r.color }} />{r.label}
+        </span>
         <span style={{ flex: 1 }} />
         <MoreHorizontal size={16} color={theme.colors.grey} />
       </div>
 
+      {/* Title and one-line summary */}
       <div>
-        <div style={{ fontWeight: 600, fontSize: 15, lineHeight: 1.3, color: d.division === 'IT' || d.division === 'Marketing' ? theme.colors.ink : theme.dept[d.division] }}>
-          {d.ticket_title}
+        <div style={{ fontWeight: 600, fontSize: 14, color: theme.colors.ink }}>{d.ticket_title}</div>
+        <div style={{ marginTop: 3, fontSize: 12, color: theme.colors.grey, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {d.summary}
         </div>
-        <p style={{ margin: '4px 0 0', fontSize: 12, color: theme.colors.grey, lineHeight: 1.45, display: '-webkit-box',
-          WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{d.summary}</p>
       </div>
 
-      {d.kind !== 'None' && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 10,
-          background: theme.colors.card, border: `1px solid ${theme.colors.track}`, fontSize: 12 }}>
-          <KindIcon size={14} color={theme.colors.ink} strokeWidth={1.5} />
-          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {d.kind === 'File' ? d.file_name : (d.title ?? d.url)}
-          </span>
-        </div>
-      )}
-
-      <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 6, fontSize: 11,
-          background: theme.colors.card, border: `1px solid ${theme.colors.track}` }}>
-          <Flag size={11} color={theme.colors.grey} /> {fmtDate(d.uploaded_at)}
-        </span>
-        {d.version > 1 && <Pill>v{d.version}</Pill>}
-        {d.requester_rating
-          ? <Pill color={revision ? theme.colors.red : theme.colors.sage}>{d.requester_rating}</Pill>
-          : <Pill color={theme.colors.grey}>Awaiting rating</Pill>}
-      </div>
-
-      <div style={{ flex: 1 }} />
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
-        <span style={{ width: 24, height: 24, borderRadius: '50%', background: theme.colors.ink, color: '#fff', fontSize: 10, fontWeight: 700,
-          display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{initials(d.analyst_name)}</span>
-        <span style={{ color: theme.colors.grey, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {d.analyst_name} → {d.requester}
-        </span>
+      {/* Analyst */}
+      <div style={{ display: 'flex', alignItems: 'center', fontSize: 12, color: theme.colors.grey }}>
+        Analyst :
         <span style={{ flex: 1 }} />
-        {d.kind === 'File' && <Paperclip size={13} color={theme.colors.grey} />}
-        {d.kind === 'Link' && <Link2 size={13} color={theme.colors.grey} />}
-        {d.revision_note && <MessageSquare size={13} color={theme.colors.red} />}
+        <span title={d.analyst_name ?? ''} style={{ width: 22, height: 22, borderRadius: '50%', fontSize: 9, fontWeight: 700, color: '#fff',
+          background: ANALYST_COLORS[d.analyst_name ?? ''] ?? theme.colors.ink, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          {initials(d.analyst_name)}
+        </span>
+      </div>
+
+      {/* Date and department */}
+      <div style={{ display: 'flex', alignItems: 'center', fontSize: 12 }}>
+        <span style={{ ...meta, color: theme.colors.ink }}><Flag size={12} color={theme.colors.grey} /> {fmtDate(d.uploaded_at)}</span>
+        <span style={{ flex: 1 }} />
+        <span style={{ padding: '2px 9px', borderRadius: 6, fontSize: 11, fontWeight: 600, background: theme.dept[d.division] + '1A', color: deptText }}>
+          {d.division}
+        </span>
+      </div>
+
+      {/* Footer */}
+      <div style={{ display: 'flex', gap: 14, paddingTop: 10, borderTop: `1px solid ${theme.colors.track}`, fontSize: 11, color: theme.colors.grey }}>
+        <span style={meta}>
+          {d.kind === 'File' ? <><Paperclip size={12} /> {(d.file_type ?? 'file').toUpperCase()}</>
+            : d.kind === 'Link' ? <><Link2 size={12} /> Link</> : <><MessageSquare size={12} /> No file</>}
+        </span>
+        <span style={meta}><FileText size={12} /> v{d.version}</span>
+        {d.revision_note && <span style={{ ...meta, color: theme.colors.red }}><MessageSquare size={12} /> 1 note</span>}
       </div>
     </button>
   );
