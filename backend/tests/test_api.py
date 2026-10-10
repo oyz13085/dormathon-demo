@@ -99,6 +99,7 @@ def test_suggest_and_submit():
             "requester": "Nurul Huda", "description": "Variance by cost centre for month-end"}
     s = client.post("/tickets/suggest", json=body).json()
     assert s["priority_method"] == "rule-based" and s["priority"] in ("Low", "Medium", "High")
+    assert s["division"] == "Finance" and s["division_method"] == "rule-based"
     assert s["category"] == "Reporting" and s["hours"]["low"] <= s["hours"]["likely"] <= s["hours"]["high"]
     r = client.post("/tickets/", json={**body, "priority": "High", "category": s["category"],
                                        "suggested_priority": s["priority"]})

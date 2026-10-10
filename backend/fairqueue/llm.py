@@ -358,3 +358,49 @@ def extract_category(title: str, description: str, known: list[str]) -> dict:
         label = (out.get("new_type_label") or "Unclassified").strip()[:40] or "Unclassified"
         return {"category": label, "confidence": "Low", "method": "llm"}
     return rule_category(title, description, known)
+
+
+# ── Department prediction ────────────────────────────────────────────────
+
+DEPTS = ("HR", "IT", "Finance", "Marketing")
+
+DEPT_KEYWORDS: list[tuple[list[str], str]] = [
+    (["payroll", "budget", "invoice", "accrual", "expense", "finance", "month-end", "month end"], "Finance"),
+    (["server", "vpn", "laptop", "software", "licence", "license", "sla", "permissions", "monitoring",
+      "script", "pipeline", "etl", "webhook"], "IT"),
+    (["campaign", "marketing", "customer", "segmentation", "churn", "sales", "launch", "roi"], "Marketing"),
+    (["leave", "headcount", "appraisal", "engagement", "attrition", "survey", "calibration",
+      "hr", "faq", "handbook"], "HR"),
+]
+
+
+def rule_department(title: str, description: str, requester: str) -> dict:
+    """Keyword match first; otherwise the requester's own department (pairings table)."""
+    text = f"{title} {description}".lower()
+    for words, dept in DEPT_KEYWORDS:
+        if any(re.search(rf"\b{re.escape(w)}", text) for w in words):
+            return {"division": dept, "method": "rule-based"}
+    from fairqueue.db import repo
+    for r in repo.get_requesters():
+        if r["name"] == requester and r.get("division") in DEPTS:
+            return {"division": r["division"], "method": "rule-based"}
+    return {"division": "IT", "method": "rule-based"}
+
+
+def predict_department(title: str, description: str, requester: str) -> dict:
+    """Which department's work is this? LLM first, rule fallback, always labelled."""
+    schema = {
+        "type": "object",
+        "properties": {"division": {"type": "string", "enum": list(DEPTS)}},
+        "required": ["division"],
+        "additionalProperties": False,
+    }
+    out = ask_json(
+        "You route a ticket to one of four departments: HR, IT, Finance, Marketing. "
+        "Reply with JSON shaped exactly like {\"division\": \"IT\"} "
+        "using the key \"division\". A person confirms the final department.",
+        f"Title: {title}\nDescription: {description or '(none)'}\nRequester: {requester}", schema)
+    div = (out or {}).get("division", (out or {}).get("department"))
+    if div in DEPTS:
+        return {"division": div, "method": "llm"}
+    return rule_department(title, description, requester)
