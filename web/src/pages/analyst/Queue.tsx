@@ -5,7 +5,7 @@ import { api, qs } from '../../api/client';
 import type { Leave, Ticket, WhatIf, Workload } from '../../api/types';
 import { useApi, useSession } from '../../session';
 import { HalfDonutGauge } from '../../components/HalfDonutGauge';
-import { TicketTable } from '../../components/TicketTable';
+import { TicketCards } from '../../components/TicketCards';
 import { Button, Card, Field, Grid, Loading, Modal, Notice, Pill, fmtDate, inputStyle } from '../../components/ui';
 
 export default function Queue() {
@@ -62,7 +62,7 @@ export default function Queue() {
 
       <Card title="My queue">
         {!tickets.data ? <Loading error={tickets.error} /> : (
-          <TicketTable tickets={mine} showPredictions showAssignee={false} tabs={['Open', 'In progress', 'Waiting', 'Closed', 'All']}
+          <TicketCards tickets={mine} tabs={['Open', 'In progress', 'Waiting', 'Closed', 'All']}
             actions={t => (
               <span style={{ display: 'flex', gap: 6 }}>
                 {t.status === 'Assigned' && <Button small variant="ghost" onClick={() => move(t, 'In progress')}><Play size={11} /> Start</Button>}
@@ -71,13 +71,6 @@ export default function Queue() {
                 {['Assigned', 'In progress', 'Waiting'].includes(t.status) && <Button small onClick={() => setClosing(t)}><CheckCircle size={11} /> Close</Button>}
               </span>
             )} />
-        )}
-        {open.some(t => t.alert) && (
-          <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {open.filter(t => t.alert).map(t => (
-              <Notice key={t.id} tone="warn"><strong>{t.title}:</strong> {t.explanation}</Notice>
-            ))}
-          </div>
         )}
       </Card>
 

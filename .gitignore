@@ -5,6 +5,8 @@ uploads/
 __pycache__/
 *.pyc
 .env
+*.env
+ignore/
 node_modules/
 web/dist/
 .ipynb_checkpoints/
