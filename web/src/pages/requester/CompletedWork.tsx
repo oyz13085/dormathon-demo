@@ -1,11 +1,16 @@
 import { useState } from 'react';
-import { FileText, Link2, MessageSquare, ThumbsUp, RotateCcw } from 'lucide-react';
+import { FileText, Link2, MessageSquare } from 'lucide-react';
 import { theme } from '../../theme';
-import { api, qs } from '../../api/client';
+import { api } from '../../api/client';
 import type { Deliverable } from '../../api/types';
+import { completedWorkPath, type ApiCompletedItem } from '../../api/requester';
 import { useApi, useSession } from '../../session';
 import { DepartmentChip } from '../../components/DepartmentChip';
-import { Button, Card, Empty, Loading, Modal, Notice, Pill, fmtDate, inputStyle } from '../../components/ui';
+import { CompletedWorkCard } from '../../components/CompletedWorkCard';
+import { CompletedWorkModal } from '../../components/CompletedWorkModal';
+import { REVIEW_FILTERS, fromApi, matchesReviewFilter, type ReviewFilter } from '../../components/completedWork';
+import { TicketFilters } from '../../components/TicketFilters';
+import { Card, Empty, Loading, Pill, fmtDate } from '../../components/ui';
 
 export function DeliverableBody({ d }: { d: Deliverable }) {
   const Icon = d.kind === 'File' ? FileText : d.kind === 'Link' ? Link2 : MessageSquare;
@@ -35,58 +40,42 @@ export function DeliverableBody({ d }: { d: Deliverable }) {
   );
 }
 
-export default function CompletedWork() {
-  const { user, refresh } = useSession();
-  const { data, error, reload } = useApi<Deliverable[]>(`/deliverables/${qs({ role: 'requester', user })}`);
-  const [revising, setRevising] = useState<Deliverable | null>(null);
-  const [note, setNote] = useState('');
-  const [msg, setMsg] = useState<string | null>(null);
+const EMPTY: Record<ReviewFilter, string> = {
+  All: '',
+  'Awaiting review': 'Nothing is waiting for your review.',
+  Reviewed: "You haven't reviewed any completed work yet.",
+};
 
-  async function rate(d: Deliverable, rating: 'Useful' | 'Needs revision', revisionNote?: string) {
-    try {
-      await api.patch(`/deliverables/${d.id}/rate`, { rating, note: revisionNote, by: user });
-      setMsg(rating === 'Useful' ? `Marked "${d.ticket_title}" useful.` : `"${d.ticket_title}" reopened as a new version.`);
-      setRevising(null); setNote('');
-      reload(); refresh();
-    } catch (e) { setMsg((e as Error).message); }
-  }
+export default function CompletedWork() {
+  const { user } = useSession();
+  // Every version with its full review history, straight from the requester API
+  const { data, error } = useApi<{ items: ApiCompletedItem[] }>(completedWorkPath(user));
+  const [filter, setFilter] = useState<ReviewFilter>('All');
+  // Keep the id, not the work, so a saved review shows up in the open modal
+  const [openId, setOpenId] = useState<number | null>(null);
+
+  const work = data ? fromApi(data.items) : null;
+  const shown = work?.filter(w => matchesReviewFilter(w, filter)) ?? [];
+  const counts = Object.fromEntries(REVIEW_FILTERS.map(f => [f, work?.filter(w => matchesReviewFilter(w, f)).length ?? 0]));
+  const open = work?.find(w => w.ticketId === openId);
 
   return (
     <Card title="My completed work">
-      {msg && <div style={{ marginBottom: 12 }}><Notice tone="ok">{msg}</Notice></div>}
-      {!data ? <Loading error={error} /> : data.length === 0 ? <Empty>Nothing delivered yet.</Empty> : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          {data.map(d => (
-            <div key={d.id} style={{ padding: 14, borderRadius: 14, background: theme.colors.background + '80',
-              border: `1px solid ${theme.colors.track}` }}>
-              <DeliverableBody d={d} />
-              <div style={{ marginTop: 10, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                {d.requester_rating ? (
-                  <Pill color={d.requester_rating === 'Useful' ? theme.colors.sage : theme.colors.red}>
-                    {d.requester_rating}{d.revision_note ? `: ${d.revision_note}` : ''}
-                  </Pill>
-                ) : (
-                  <>
-                    <Button small onClick={() => rate(d, 'Useful')}><ThumbsUp size={12} /> Useful</Button>
-                    <Button small variant="danger" onClick={() => setRevising(d)}><RotateCcw size={12} /> Needs revision</Button>
-                  </>
-                )}
-              </div>
+      {!work ? <Loading error={error} />
+        : work.length === 0 ? (
+          <Empty>Nothing has been delivered to {user} yet. Finished work shows up here once an analyst closes one of your tickets.</Empty>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <TicketFilters tabs={REVIEW_FILTERS} tab={filter} onTab={setFilter} counts={counts} />
+            <div className="fq-ticket-grid-wrap">
+              <ul className="fq-ticket-grid" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+                {shown.map(w => <li key={w.ticketId}><CompletedWorkCard work={w} onOpen={() => setOpenId(w.ticketId)} /></li>)}
+              </ul>
+              {shown.length === 0 && <Empty>{EMPTY[filter]}</Empty>}
             </div>
-          ))}
-        </div>
-      )}
-      {revising && (
-        <Modal title={`Needs revision: ${revising.ticket_title}`} onClose={() => setRevising(null)}>
-          <p style={{ marginTop: 0, fontSize: 13 }}>The ticket goes back to the analyst as a new version, so the rework is tracked.</p>
-          <textarea value={note} onChange={e => setNote(e.target.value)} rows={4} placeholder="What needs to change?"
-            style={{ ...inputStyle, resize: 'vertical' }} />
-          <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
-            <Button variant="danger" disabled={!note.trim()} onClick={() => rate(revising, 'Needs revision', note)}>Send back</Button>
-            <Button variant="ghost" onClick={() => setRevising(null)}>Cancel</Button>
           </div>
-        </Modal>
-      )}
+        )}
+      {open && <CompletedWorkModal work={open} onClose={() => setOpenId(null)} />}
     </Card>
   );
 }
