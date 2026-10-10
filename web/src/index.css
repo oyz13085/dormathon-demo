@@ -96,3 +96,13 @@ body {
 /* Clickable cards: a small lift on hover */
 .fq-lift { transition: transform .12s ease, box-shadow .12s ease; }
 .fq-lift:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(35,37,43,0.10) !important; }
+
+/* Three-up card rows (deliverables library, summary widgets) */
+.fq-grid3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  align-items: stretch;
+}
+@media (max-width: 1100px) { .fq-grid3 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 700px)  { .fq-grid3 { grid-template-columns: 1fr; } }

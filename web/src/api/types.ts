@@ -32,6 +32,7 @@ export interface Ticket {
   confidence?: "High" | "Low";
   created_at?: string;
   closed_at?: string | null;
+  actual_hours?: number | null;
   deliverable_count?: number;
   // risk (lead, and the analyst's own queue)
   p_miss?: number | null;
@@ -194,7 +195,7 @@ export interface WhatIf {
   summary: string;
   broken: {
     ticket_id: number; title: string; division: Dept; priority: Priority; deadline: string;
-    p_miss_before: number | null; p_miss_after: number; hours: number;
+    p_miss_before: number | null; p_miss_after: number; hours: number; hours_available_after?: number;
     takeover: { analyst_id: number; name: string; fit: number; p_miss_if_moved: number; explanation: string } | null;
   }[];
   unaffected: { ticket_id: number; title: string; deadline: string; p_miss_after: number }[];
