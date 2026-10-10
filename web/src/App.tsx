@@ -3,6 +3,7 @@ import { RotateCw } from 'lucide-react';
 import { theme } from './theme';
 import { SessionProvider, useSession } from './session';
 import type { Role } from './api/types';
+import { Page } from './components/ui';
 
 import NewTicket from './pages/requester/NewTicket';
 import MyTickets from './pages/requester/MyTickets';
@@ -54,46 +55,45 @@ function TopBar() {
       : [];
 
   return (
-    <header style={{
-      position: 'sticky', top: 0, zIndex: 100, background: theme.colors.card,
-      borderBottom: `1px solid ${theme.colors.track}`, boxShadow: '0 1px 4px rgba(35,37,43,0.05)',
-      padding: '8px 24px', display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap',
-    }}>
+    <header className="fq-topbar">
       <Link to={NAV[role][0].path} style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 8 }}>
         <span style={{ width: 28, height: 28, borderRadius: 8, background: theme.colors.accent, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <span style={{ color: '#fff', fontWeight: 800, fontSize: 13 }}>FQ</span>
         </span>
-        <span style={{ fontWeight: 700, fontSize: 15, color: theme.colors.ink }}>FairQueue</span>
+        <span className="fq-brand-name" style={{ fontWeight: 700, fontSize: 15, color: theme.colors.ink }}>FairQueue</span>
       </Link>
 
-      <nav style={{ display: 'flex', gap: 4, flex: 1, flexWrap: 'wrap' }}>
+      <nav className="fq-nav" aria-label="Pages">
         {NAV[role].map(n => {
           const active = location.pathname === n.path;
           return (
-            <Link key={n.path} to={n.path} style={{
-              padding: '5px 12px', borderRadius: theme.radius.pill, fontSize: 13, fontWeight: 600, textDecoration: 'none',
+            <Link key={n.path} to={n.path} aria-current={active ? 'page' : undefined} style={{
+              padding: '6px 12px', borderRadius: theme.radius.pill, fontSize: 13, fontWeight: 600, textDecoration: 'none',
               background: active ? theme.colors.ink : 'transparent', color: active ? '#fff' : theme.colors.grey,
             }}>{n.label}</Link>
           );
         })}
       </nav>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-        <span style={{ fontSize: 11, color: theme.colors.grey }}>Demo role</span>
-        {(['requester', 'analyst', 'lead'] as Role[]).map(r => (
-          <button key={r} onClick={() => { setRole(r); navigate(NAV[r][0].path); }} style={{
-            padding: '4px 11px', borderRadius: theme.radius.pill, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600,
-            background: role === r ? theme.colors.accent : theme.colors.track, color: role === r ? '#fff' : theme.colors.grey,
-          }}>{ROLE_LABEL[r]}</button>
-        ))}
+      <div className="fq-roles">
+        <span className="fq-roles-label">Demo role</span>
+        <div role="group" aria-label="Demo role" style={{ display: 'flex', gap: 2, padding: 3, borderRadius: theme.radius.pill, background: theme.colors.track }}>
+          {(['requester', 'analyst', 'lead'] as Role[]).map(r => (
+            <button key={r} onClick={() => { setRole(r); navigate(NAV[r][0].path); }} aria-pressed={role === r} style={{
+              padding: '4px 11px', borderRadius: theme.radius.pill, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+              background: role === r ? theme.colors.accent : 'transparent', color: role === r ? '#fff' : theme.colors.grey, whiteSpace: 'nowrap',
+            }}>{ROLE_LABEL[r]}</button>
+          ))}
+        </div>
         {identities.length > 0 && (
           <select value={user} onChange={e => setUser(e.target.value)} aria-label="Who are you?" style={{
-            padding: '4px 8px', borderRadius: 8, border: `1.5px solid ${theme.colors.track}`, fontSize: 12, background: theme.colors.card,
+            padding: '5px 8px', borderRadius: 10, border: `1.5px solid ${theme.colors.track}`, fontSize: 12, background: theme.colors.card,
+            fontFamily: 'inherit', color: theme.colors.ink, minWidth: 0,
           }}>
             {identities.map(i => <option key={i.value} value={i.value}>{i.label}</option>)}
           </select>
         )}
-        <button onClick={refresh} title="Reload data" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}>
+        <button onClick={refresh} title="Reload data" aria-label="Reload data" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, flexShrink: 0 }}>
           <RotateCw size={15} color={theme.colors.grey} />
         </button>
       </div>
@@ -106,7 +106,7 @@ function AppRoutes() {
   return (
     <>
       <TopBar />
-      <main style={{ flex: 1, maxWidth: 1440, width: '100%', margin: '0 auto', padding: 24 }}>
+      <main className="fq-main">
         <Routes>
           <Route path="/" element={<Navigate to={NAV[role][0].path} replace />} />
           <Route path="/requester/new" element={<NewTicket />} />
@@ -115,7 +115,7 @@ function AppRoutes() {
           <Route path="/analyst/queue" element={<Queue />} />
           <Route path="/analyst/work" element={<MyWork />} />
           <Route path="/analyst/new" element={<NewTicket />} />
-          <Route path="/analyst/requested" element={<><MyTickets /><div style={{ height: 16 }} /><CompletedWork /></>} />
+          <Route path="/analyst/requested" element={<Page><MyTickets /><CompletedWork /></Page>} />
           <Route path="/lead/dashboard" element={<Dashboard />} />
           <Route path="/lead/assign" element={<Assign />} />
           <Route path="/lead/leave" element={<LeavePage />} />

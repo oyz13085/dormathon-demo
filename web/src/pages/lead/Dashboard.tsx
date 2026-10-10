@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { ElementType, ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import {
   AlertCircle, AlertTriangle, BarChart2, Bot, CalendarDays, CheckCircle, ChevronRight, Clock, Flame, Gauge, Inbox,
-  MessageCircle, PieChart as PieIcon, Send, TrendingUp, Users, X,
+  MessageCircle, PieChart as PieIcon, Send, TrendingUp, Users,
 } from 'lucide-react';
 import { CartesianGrid, Cell, Legend, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis, ReferenceLine } from 'recharts';
 import { theme } from '../../theme';
@@ -14,7 +13,7 @@ import { HatchedBar } from '../../components/HatchedBar';
 import { DepartmentChip } from '../../components/DepartmentChip';
 import { ANALYST_COLORS } from '../../components/LeaveCalendar';
 import { Avatar, RiskActionModal, TicketCard, TicketDetailModal } from '../../components/TicketModals';
-import { Button, Card, Empty, Grid, Loading, Notice, PRIORITY_COLOR, Pill, StatTile, cardGrid, fmtDate, initials, inputStyle } from '../../components/ui';
+import { Button, Card, Empty, FilterChip, Grid, Highlight, HighlightRow, Hint, Loading, Notice, PRIORITY_COLOR, Page, Pill, StatRow, StatTile, cardGrid, fmtDate, initials, inputStyle } from '../../components/ui';
 
 const STATUSES: TicketStatus[] = ['Unassigned', 'Assigned', 'In progress', 'Waiting', 'Closed'];
 const STATUS_COLOR: Record<TicketStatus, string> = {
@@ -43,7 +42,7 @@ export default function Dashboard() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: theme.space.gap }}>
+    <Page>
       <WeekSummary tickets={tickets.data} summary={summary.data} workload={workload.data} forecast={forecast.data}
         risk={risk.data} division={division} onClear={() => setDivision(null)} onOpenRisk={setActOn} />
 
@@ -64,7 +63,7 @@ export default function Dashboard() {
 
       {openTicket !== null && <TicketDetailModal ticketId={openTicket} onClose={() => setOpenTicket(null)} onAct={act} />}
       {actOn && <RiskActionModal risk={actOn} onClose={() => setActOn(null)} />}
-    </div>
+    </Page>
   );
 }
 
@@ -78,28 +77,6 @@ function weekBounds(): [Date, Date] {
 }
 const parse = (s?: string | null) => s ? new Date(s.length <= 10 ? `${s}T00:00:00` : s.replace(' ', 'T')) : null;
 
-
-function Highlight({ icon: Icon, color, title, children, onClick }: {
-  icon: ElementType; color: string; title: string; children: ReactNode; onClick?: () => void;
-}) {
-  const body = (
-    <>
-      <span style={{ width: 38, height: 38, borderRadius: 11, background: color + '18', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <Icon size={16} color={color} />
-      </span>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 11, color: theme.colors.grey, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.4 }}>{title}</div>
-        <div style={{ fontSize: 14, marginTop: 4, lineHeight: 1.45 }}>{children}</div>
-      </div>
-      {onClick && <ChevronRight size={15} color={theme.colors.grey} style={{ alignSelf: 'center' }} />}
-    </>
-  );
-  const style = { display: 'flex', gap: 14, padding: '18px 20px', borderRadius: theme.radius.card, border: 'none', boxShadow: theme.shadow,
-    background: theme.colors.card, textAlign: 'left' as const, fontFamily: 'inherit', color: theme.colors.ink, borderLeft: `4px solid ${color}` };
-  return onClick
-    ? <button onClick={onClick} className="fq-lift" style={{ ...style, cursor: 'pointer' }}>{body}</button>
-    : <div style={style}>{body}</div>;
-}
 
 function WeekSummary({ tickets, summary, workload, forecast, risk, division, onClear, onOpenRisk }: {
   tickets: Ticket[] | null; summary: Summary | null; workload: Workload[] | null; forecast: Forecast | null;
@@ -125,13 +102,8 @@ function WeekSummary({ tickets, summary, workload, forecast, risk, division, onC
     <>
       <Card title={<>This week <span style={{ fontWeight: 400, color: theme.colors.grey, fontSize: 13 }}>
         · {fmtDate(start.toISOString())} – {fmtDate(lastDay.toISOString())}</span></>} icon={CalendarDays} iconColor={theme.colors.accent}
-        right={division && (
-          <button onClick={onClear} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: theme.radius.pill,
-            border: 'none', background: theme.colors.track, cursor: 'pointer', fontSize: 12, fontWeight: 600, color: theme.colors.ink }}>
-            Showing {division} only <X size={12} />
-          </button>
-        )}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
+        right={division && <FilterChip onClear={onClear}>Showing {division} only</FilterChip>}>
+        <StatRow>
           <StatTile icon={Inbox} color={theme.colors.ink} label="New tickets" value={created} hint="created this week" />
           <StatTile icon={CheckCircle} color={theme.colors.sage} label="Closed" value={closed} hint="finished this week" />
           <StatTile icon={Clock} color={theme.colors.accent} label="Still due" value={due} hint="open, deadline this week" />
@@ -143,11 +115,11 @@ function WeekSummary({ tickets, summary, workload, forecast, risk, division, onC
               </span>
               {division ? `${booked}h of ${division} work in the team's ${capacity}h` : `${booked}h of ${capacity}h booked`}
             </span>} />
-        </div>
+        </StatRow>
       </Card>
 
       {/* Highlights sit outside the summary card and share the row equally */}
-      <div className="fq-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: theme.space.gap }}>
+      <HighlightRow>
         {top ? (
           <Highlight icon={Flame} color={theme.colors.red} title="Needs attention" onClick={() => onOpenRisk(top)}>
             <strong>{top.ticket_title}</strong> is {Math.round(top.p_miss * 100)}% likely to miss {fmtDate(top.deadline)}
@@ -166,7 +138,7 @@ function WeekSummary({ tickets, summary, workload, forecast, risk, division, onC
             {next.spikes.length > 0 && <> · {next.spikes.join(', ')} spike</>}
           </Highlight>
         )}
-      </div>
+      </HighlightRow>
     </>
   );
 }
@@ -321,9 +293,9 @@ function RiskCards({ risk, error, onOpen }: { risk: RiskList | null; error: stri
   const items = risk ? [...risk.alerts, ...risk.watch] : [];
   return (
     <Card title="Risk tickets" icon={AlertCircle} iconColor={theme.colors.red}
-      right={risk && <span style={{ fontSize: 11, color: theme.colors.grey }}>
+      right={risk && <Hint>
         red = alert (≥{Math.round(risk.threshold * 100)}% chance of missing) · amber = watching · click to reassign or add support
-      </span>}>
+      </Hint>}>
       {!risk ? <Loading error={error} /> : items.length === 0 ? <Empty>No tickets at risk.</Empty> : (
         <div style={cardGrid(280)}>
           {items.map(r => {
@@ -378,7 +350,7 @@ function WorkloadCards({ workload, error, tickets, onOpen }: {
 
   return (
     <Card title="Workload per analyst" icon={Users} iconColor={theme.colors.sand}
-      right={<span style={{ fontSize: 11, color: theme.colors.grey }}>Open predicted hours vs weekly hours · click an analyst to see their tickets</span>}>
+      right={<Hint>Open predicted hours vs weekly hours · click an analyst to see their tickets</Hint>}>
       <div style={cardGrid(180)}>
         {workload.map(a => {
           const mine = open.filter(t => t.assignee_id === a.analyst_id);
@@ -451,7 +423,7 @@ function VolumeCard({ forecast, error, division }: { forecast: Forecast | null; 
 
   return (
     <Card title="Volume by department (hours per week)" icon={TrendingUp} iconColor={theme.colors.accent}
-      right={<span style={{ fontSize: 11, color: theme.colors.grey }}>solid = actual · dashed = forecast</span>}>
+      right={<Hint>solid = actual · dashed = forecast</Hint>}>
       <div style={{ height: 280 }}>
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>

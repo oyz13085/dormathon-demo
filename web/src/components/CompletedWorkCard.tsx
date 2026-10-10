@@ -8,7 +8,7 @@ export function CompletedWorkCard({ work: w, onOpen }: { work: CompletedWork; on
   const status = reviewStatus(w);
   const files = attachments(w).length;
   return (
-    <button type="button" className="fq-ticket-card" onClick={onOpen} aria-haspopup="dialog" style={{
+    <button type="button" className="fq-ticket-card fq-lift" onClick={onOpen} aria-haspopup="dialog" style={{
       display: 'flex', flexDirection: 'column', gap: 12, width: '100%', height: '100%', padding: 16,
       textAlign: 'left', font: 'inherit', color: theme.colors.ink, cursor: 'pointer',
     }}>

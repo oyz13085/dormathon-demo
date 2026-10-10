@@ -1,10 +1,11 @@
 import { useEffect, useId, useRef, type CSSProperties, type ElementType, type ReactNode } from 'react';
-import { X } from 'lucide-react';
+import { ChevronRight, Search, X } from 'lucide-react';
 import { theme } from '../theme';
 
+// Padding shrinks on small windows (--fq-pad in index.css), so cards keep their room for content
 export const card: CSSProperties = {
   background: theme.colors.card, borderRadius: theme.radius.card,
-  padding: theme.space.pad, boxShadow: theme.shadow,
+  padding: 'var(--fq-pad)', boxShadow: theme.shadow, minWidth: 0,
 };
 
 export function Card({ title, icon: Icon, iconColor, right, children, style }: {
@@ -21,8 +22,8 @@ export function Card({ title, icon: Icon, iconColor, right, children, style }: {
               <Icon size={13} color={iconColor ?? theme.colors.grey} strokeWidth={1.5} />
             </span>
           )}
-          <h2 style={{ margin: 0, fontSize: theme.font.title, fontWeight: 600, color: theme.colors.ink, flex: 1 }}>{title}</h2>
-          {right}
+          <h2 style={{ margin: 0, fontSize: theme.font.title, fontWeight: 600, color: theme.colors.ink, flex: '1 1 180px', minWidth: 0 }}>{title}</h2>
+          {right && <div style={{ flex: '0 1 auto', minWidth: 0, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>{right}</div>}
         </div>
       )}
       {children}
@@ -131,7 +132,7 @@ export function Modal({ title, onClose, children, width = 560, centered }: {
   }, []);
 
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(35,37,43,0.35)', zIndex: 200,
+    <div onClick={onClose} className="fq-modal-backdrop" style={{ position: 'fixed', inset: 0, background: 'rgba(35,37,43,0.35)', zIndex: 200,
       display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: centered ? '24px 16px' : '60px 16px', overflowY: 'auto' }}>
       <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={titleId} onClick={e => e.stopPropagation()}
         style={{ ...card, width: '100%', maxWidth: width, margin: centered ? 'auto' : undefined }}>
@@ -218,15 +219,120 @@ export const cardGrid = (min: number, stretch = true) => ({
 
 export function StatTile({ icon: Icon, color, label, value, hint }: { icon: ElementType; color: string; label: string; value: ReactNode; hint?: ReactNode }) {
   return (
-    <div style={{ padding: 16, borderRadius: 16, background: color + '10', display: 'flex', flexDirection: 'column', gap: 10 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <span style={{ width: 30, height: 30, borderRadius: 9, background: color + '22', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+    <div className="fq-stat" style={{ borderRadius: 16, background: color + '10', display: 'flex', flexDirection: 'column', gap: 10, minWidth: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+        <span style={{ width: 30, height: 30, borderRadius: 9, background: color + '22', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <Icon size={15} color={color} strokeWidth={2} />
         </span>
-        <span style={{ fontSize: 12, color: theme.colors.grey, fontWeight: 500 }}>{label}</span>
+        <span style={{ fontSize: 12, color: theme.colors.grey, fontWeight: 500, lineHeight: 1.3 }}>{label}</span>
       </div>
-      <div style={{ fontSize: 32, fontWeight: 700, lineHeight: 1, color: theme.colors.ink }}>{value}</div>
+      <div className="fq-stat-value" style={{ fontWeight: 700, lineHeight: 1, color: theme.colors.ink }}>{value}</div>
       {hint && <div style={{ fontSize: 11, color: theme.colors.grey }}>{hint}</div>}
     </div>
+  );
+}
+
+// ── Page building blocks shared by every screen (the dashboard / assign look) ──
+
+/** A row of StatTiles: as many per row as fit, two per row on a phone. */
+export function StatRow({ children }: { children: ReactNode }) {
+  return <div className="fq-stat-row">{children}</div>;
+}
+
+/** Vertical stack of cards with the standard gap. */
+export function Page({ children }: { children: ReactNode }) {
+  return <div style={{ display: 'flex', flexDirection: 'column', gap: theme.space.gap, minWidth: 0 }}>{children}</div>;
+}
+
+/** Grey helper text for a card's right-hand slot. */
+export function Hint({ children }: { children: ReactNode }) {
+  return <span style={{ fontSize: 11, color: theme.colors.grey, lineHeight: 1.4 }}>{children}</span>;
+}
+
+/** Row of highlight cards that share the width equally and stack when narrow. */
+export function HighlightRow({ children }: { children: ReactNode }) {
+  return <div className="fq-highlights">{children}</div>;
+}
+
+/** One headline finding: icon chip, small caps title, one sentence. Coloured left edge. */
+export function Highlight({ icon: Icon, color, title, children, onClick }: {
+  icon: ElementType; color: string; title: string; children: ReactNode; onClick?: () => void;
+}) {
+  const body = (
+    <>
+      <span style={{ width: 38, height: 38, borderRadius: 11, background: color + '18', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <Icon size={16} color={color} />
+      </span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 11, color: theme.colors.grey, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.4 }}>{title}</div>
+        <div style={{ fontSize: 14, marginTop: 4, lineHeight: 1.45 }}>{children}</div>
+      </div>
+      {onClick && <ChevronRight size={15} color={theme.colors.grey} style={{ alignSelf: 'center', flexShrink: 0 }} />}
+    </>
+  );
+  const style: CSSProperties = { display: 'flex', gap: 14, padding: '18px 20px', borderRadius: theme.radius.card, border: 'none', boxShadow: theme.shadow,
+    background: theme.colors.card, textAlign: 'left', fontFamily: 'inherit', color: theme.colors.ink, borderLeft: `4px solid ${color}`, minWidth: 0 };
+  return onClick
+    ? <button onClick={onClick} className="fq-lift" style={{ ...style, cursor: 'pointer' }}>{body}</button>
+    : <div style={style}>{body}</div>;
+}
+
+/** Ink pill tabs with an optional count. */
+export function TabPills<T extends string>({ tabs, value, onChange, counts }: {
+  tabs: readonly T[]; value: T; onChange: (t: T) => void; counts?: Partial<Record<T, number>>;
+}) {
+  return (
+    <div role="tablist" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+      {tabs.map(t => (
+        <button key={t} role="tab" aria-selected={value === t} onClick={() => onChange(t)} style={{
+          padding: '6px 14px', borderRadius: theme.radius.pill, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
+          background: value === t ? theme.colors.ink : theme.colors.track, color: value === t ? '#fff' : theme.colors.ink, whiteSpace: 'nowrap',
+        }}>{t}{counts?.[t] !== undefined && <span style={{ opacity: 0.6 }}> {counts[t]}</span>}</button>
+      ))}
+    </div>
+  );
+}
+
+/** Search input with a clear button; grows to fill the toolbar on small windows. */
+export function SearchBox({ value, onChange, placeholder = 'Search…' }: { value: string; onChange: (v: string) => void; placeholder?: string }) {
+  return (
+    <div className="fq-search" style={{ position: 'relative' }}>
+      <Search size={14} color={theme.colors.grey} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
+      <input value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} aria-label={placeholder}
+        style={{ ...inputStyle, paddingLeft: 32, paddingRight: 32 }} />
+      {value && (
+        <button onClick={() => onChange('')} aria-label="Clear search" style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
+          width: 22, height: 22, borderRadius: '50%', border: 'none', background: theme.colors.track, cursor: 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <X size={12} />
+        </button>
+      )}
+    </div>
+  );
+}
+
+/** Tabs on the left, search (and anything else) on the right; wraps on small windows. */
+export function Toolbar({ children }: { children: ReactNode }) {
+  return <div className="fq-toolbar">{children}</div>;
+}
+
+/** Small grey tile with a label, a bold value and a sub line. */
+export function MiniStat({ label, value, sub }: { label: string; value: ReactNode; sub?: ReactNode }) {
+  return (
+    <div style={{ padding: '10px 14px', borderRadius: 12, background: theme.colors.background, minWidth: 0 }}>
+      <div style={{ fontSize: 11, color: theme.colors.grey }}>{label}</div>
+      <div style={{ fontSize: 15, fontWeight: 700, marginTop: 2 }}>{value}</div>
+      {sub && <div style={{ fontSize: 11, color: theme.colors.grey }}>{sub}</div>}
+    </div>
+  );
+}
+
+/** Pill showing a department filter that's on, with a way to clear it. */
+export function FilterChip({ children, onClear }: { children: ReactNode; onClear: () => void }) {
+  return (
+    <button onClick={onClear} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: theme.radius.pill,
+      border: 'none', background: theme.colors.track, cursor: 'pointer', fontSize: 12, fontWeight: 600, color: theme.colors.ink, fontFamily: 'inherit' }}>
+      {children} <X size={12} />
+    </button>
   );
 }

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { FileText, Link2, MessageSquare } from 'lucide-react';
+import { Eye, FileText, Link2, MessageSquare, PackageCheck, RotateCcw, ThumbsUp } from 'lucide-react';
 import { theme } from '../../theme';
 import { api } from '../../api/client';
 import type { Deliverable } from '../../api/types';
@@ -8,9 +8,8 @@ import { useApi, useSession } from '../../session';
 import { DepartmentChip } from '../../components/DepartmentChip';
 import { CompletedWorkCard } from '../../components/CompletedWorkCard';
 import { CompletedWorkModal } from '../../components/CompletedWorkModal';
-import { REVIEW_FILTERS, fromApi, matchesReviewFilter, type ReviewFilter } from '../../components/completedWork';
-import { TicketFilters } from '../../components/TicketFilters';
-import { Card, Empty, Loading, Pill, fmtDate } from '../../components/ui';
+import { REVIEW_FILTERS, fromApi, matchesReviewFilter, reviewStatus, type ReviewFilter } from '../../components/completedWork';
+import { Card, Empty, Hint, Loading, Pill, StatRow, StatTile, TabPills, Toolbar, fmtDate } from '../../components/ui';
 
 export function DeliverableBody({ d }: { d: Deliverable }) {
   const Icon = d.kind === 'File' ? FileText : d.kind === 'Link' ? Link2 : MessageSquare;
@@ -56,23 +55,32 @@ export default function CompletedWork() {
 
   const work = data ? fromApi(data.items) : null;
   const shown = work?.filter(w => matchesReviewFilter(w, filter)) ?? [];
-  const counts = Object.fromEntries(REVIEW_FILTERS.map(f => [f, work?.filter(w => matchesReviewFilter(w, f)).length ?? 0]));
+  const counts = Object.fromEntries(REVIEW_FILTERS.map(f => [f, work?.filter(w => matchesReviewFilter(w, f)).length ?? 0])) as Record<ReviewFilter, number>;
   const open = work?.find(w => w.ticketId === openId);
+  const status = (s: string) => work?.filter(w => reviewStatus(w) === s).length ?? 0;
 
   return (
-    <Card title="My completed work">
+    <Card title="My completed work" icon={PackageCheck} iconColor={theme.colors.sage}
+      right={<Hint>Open a card to download the work and say if it was useful</Hint>}>
       {!work ? <Loading error={error} />
         : work.length === 0 ? (
           <Empty>Nothing has been delivered to {user} yet. Finished work shows up here once an analyst closes one of your tickets.</Empty>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <TicketFilters tabs={REVIEW_FILTERS} tab={filter} onTab={setFilter} counts={counts} />
-            <div className="fq-ticket-grid-wrap">
-              <ul className="fq-ticket-grid" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-                {shown.map(w => <li key={w.ticketId}><CompletedWorkCard work={w} onOpen={() => setOpenId(w.ticketId)} /></li>)}
-              </ul>
-              {shown.length === 0 && <Empty>{EMPTY[filter]}</Empty>}
-            </div>
+            <StatRow>
+              <StatTile icon={PackageCheck} color={theme.colors.ink} label="Delivered" value={work.length} hint="tickets with finished work" />
+              <StatTile icon={Eye} color={theme.colors.sand} label="Awaiting your review" value={status('Awaiting review')} hint="tell the analyst how it went" />
+              <StatTile icon={ThumbsUp} color={theme.colors.sage} label="Useful" value={status('Useful')} hint="rated useful" />
+              <StatTile icon={RotateCcw} color={theme.colors.red} label="Sent back" value={status('Needs revision')} hint="needs revision" />
+            </StatRow>
+            <Toolbar>
+              <TabPills tabs={REVIEW_FILTERS} value={filter} onChange={setFilter} counts={counts} />
+            </Toolbar>
+            {shown.length === 0 ? <Empty>{EMPTY[filter]}</Empty> : (
+              <div className="fq-cards" style={{ ['--min' as string]: '260px' }}>
+                {shown.map(w => <CompletedWorkCard key={w.ticketId} work={w} onOpen={() => setOpenId(w.ticketId)} />)}
+              </div>
+            )}
           </div>
         )}
       {open && <CompletedWorkModal work={open} onClose={() => setOpenId(null)} />}

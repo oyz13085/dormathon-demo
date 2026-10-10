@@ -4,11 +4,11 @@
  * Hallmark · pre-emit critique: P5 H5 E4 S5 R4 V4
  */
 import { useState, type ReactNode } from 'react';
-import { AlertCircle, Search } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
 import { theme } from '../theme';
 import type { Ticket } from '../api/types';
 import { StatusPill } from './StatusPill';
-import { Empty, Modal, PRIORITY_COLOR, RiskBadge, fmtDate, hours } from './ui';
+import { Empty, Modal, PRIORITY_COLOR, RiskBadge, SearchBox, TabPills, Toolbar, fmtDate, hours } from './ui';
 
 type Tab = 'All' | 'Open' | 'Unassigned' | 'In progress' | 'Waiting' | 'Closed';
 
@@ -26,8 +26,7 @@ export function TicketCards({ tickets, actions, tabs = ['Open', 'In progress', '
   const [selected, setSelected] = useState<Ticket | null>(null);
 
   const filtered = tickets
-    .filter(t => tab === 'All' || (tab === 'Open' ? t.status !== 'Closed'
-      : tab === 'Unassigned' ? (!t.assignee_id && t.status !== 'Closed') : t.status === tab))
+    .filter(t => inTab(t, tab))
     .filter(t => `${t.title} ${t.division} ${t.requester} ${t.category ?? ''}`.toLowerCase()
       .includes(search.toLowerCase()));
   const urgent = filtered.filter(t => t.alert).sort(byDeadline);
@@ -35,23 +34,10 @@ export function TicketCards({ tickets, actions, tabs = ['Open', 'In progress', '
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-        {tabs.map(t => (
-          <button key={t} onClick={() => setTab(t)} style={{
-            padding: '5px 14px', borderRadius: theme.radius.pill, border: 'none', cursor: 'pointer',
-            fontSize: 13, fontWeight: 600,
-            background: tab === t ? theme.colors.ink : theme.colors.track,
-            color: tab === t ? '#fff' : theme.colors.grey,
-          }}>{t}</button>
-        ))}
-        <div style={{ marginLeft: 'auto', position: 'relative' }}>
-          <Search size={14} color={theme.colors.grey} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)' }} />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search tickets…" style={{
-            paddingLeft: 32, paddingRight: 12, paddingTop: 6, paddingBottom: 6, borderRadius: theme.radius.pill,
-            border: `1.5px solid ${theme.colors.track}`, fontSize: 13, outline: 'none', background: theme.colors.card, width: 200,
-          }} />
-        </div>
-      </div>
+      <Toolbar>
+        <TabPills tabs={tabs} value={tab} onChange={setTab} counts={Object.fromEntries(tabs.map(t => [t, tickets.filter(x => inTab(x, t)).length]))} />
+        <SearchBox value={search} onChange={setSearch} placeholder="Search tickets…" />
+      </Toolbar>
 
       {filtered.length === 0 && <Empty>No tickets here.</Empty>}
       {urgent.length > 0 && (
@@ -73,6 +59,11 @@ export function TicketCards({ tickets, actions, tabs = ['Open', 'In progress', '
   );
 }
 
+function inTab(t: Ticket, tab: Tab): boolean {
+  return tab === 'All' || (tab === 'Open' ? t.status !== 'Closed'
+    : tab === 'Unassigned' ? (!t.assignee_id && t.status !== 'Closed') : t.status === tab);
+}
+
 function byDeadline(a: Ticket, b: Ticket): number {
   return (a.deadline ?? '').localeCompare(b.deadline ?? '');
 }
@@ -82,7 +73,7 @@ function Group({ label, tone, children }: { label: string; tone?: string; childr
     <section style={{ display: 'flex', flexDirection: 'column', gap: 10, minWidth: 0 }}>
       <h3 style={{ margin: 0, fontSize: 12, fontWeight: 700, color: tone ?? theme.colors.grey,
         textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</h3>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 340px), 1fr))', gap: 12 }}>
+      <div className="fq-cards" style={{ ['--min' as string]: '300px' }}>
         {children}
       </div>
     </section>
