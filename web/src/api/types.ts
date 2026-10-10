@@ -123,7 +123,7 @@ export interface RecommendationCard {
   hours: { low: number; likely: number; high: number };
   confidence: "High" | "Low";
   thresholds: { good_fit: number; poor_fit: number };
-  decision: "good" | "possible" | "poor" | "low_confidence" | "no_partner";
+  decision: "good" | "possible" | "poor" | "low_confidence" | "no_partner" | "partner_busy";
   note: string;
   explanation: string;
   facts: string[];

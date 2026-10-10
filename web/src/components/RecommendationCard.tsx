@@ -25,6 +25,7 @@ const DECISION: Record<Card['decision'], { label: string; color: string }> = {
   poor: { label: 'Poor fit: someone else recommended', color: theme.colors.red },
   low_confidence: { label: 'Low confidence: lead decides', color: theme.colors.grey },
   no_partner: { label: 'No usual partner: best fit', color: theme.colors.ink },
+  partner_busy: { label: 'Usual partner likely to miss: safer analyst', color: theme.colors.accent },
 };
 
 function Person({ c, tag, highlight, thresholds }: { c: Candidate; tag: string; highlight?: boolean; thresholds: Card['thresholds'] }) {
@@ -71,7 +72,7 @@ export function RecommendationCard({ card, onAccept, onOverride, onAddSupport }:
         </div>
       </div>
 
-      {card.note && <Notice tone={card.decision === 'good' ? 'ok' : card.decision === 'possible' ? 'warn' : card.decision === 'poor' ? 'error' : 'info'}>{card.note}</Notice>}
+      {card.note && <Notice tone={card.decision === 'good' ? 'ok' : card.decision === 'possible' || card.decision === 'partner_busy' ? 'warn' : card.decision === 'poor' ? 'error' : 'info'}>{card.note}</Notice>}
 
       {card.recommended && (
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>

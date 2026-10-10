@@ -147,6 +147,17 @@ def explain(c: Candidate, category: str) -> str:
     return f"{head}: an average match on every part."
 
 
+# Who gets the ticket: fit, minus the load penalty, minus a penalty for the chance of missing
+# the deadline with that analyst's queue, plus a small nudge for the usual partner. The replay
+# showed that weighing deadline risk this directly is what beats count-based balancing.
+RISK_PENALTY = 60     # points off per 100% chance of missing
+PARTNER_BONUS = 5     # points for the usual partner (continuity, fewer handovers)
+
+
+def risk_adjusted(fit: float, load_penalty: float, p_miss: float, is_partner: bool) -> float:
+    return fit - load_penalty - RISK_PENALTY * p_miss + (PARTNER_BONUS if is_partner else 0)
+
+
 def candidates(ticket: dict) -> list[Candidate]:
     analysts = repo.get_analysts()
     weights = repo.get_fit_settings()
@@ -160,7 +171,8 @@ def candidates(ticket: dict) -> list[Candidate]:
 
 
 def recommend(ticket: dict) -> dict:
-    """The recommendation card: usual partner first, thresholds decide the rest."""
+    """The recommendation card. The pick is the best risk-adjusted fit (usual partner nudged up);
+    the thresholds on the partner's fit decide how the card explains it."""
     weights = repo.get_fit_settings()
     good, poor = weights["good_fit"], weights["poor_fit"]
     cands = candidates(ticket)
@@ -168,7 +180,9 @@ def recommend(ticket: dict) -> dict:
     low, likely, high, _ = schedule.ticket_hours(ticket)
     partner_id = repo.usual_partner(ticket.get("requester") or "")
     partner = by_id.get(partner_id) if partner_id else None
-    best = cands[0] if cands else None
+    best = max(cands, key=lambda c: risk_adjusted(c.fit, c.load_penalty, 1 - c.breakdown["deadline"],
+                                                  partner is not None and c.analyst_id == partner.analyst_id)) if cands else None
+    miss = lambda c: round((1 - c.breakdown["deadline"]) * 100)
 
     card = {
         "ticket_id": ticket.get("id"), "title": ticket.get("title"),
@@ -195,6 +209,12 @@ def recommend(ticket: dict) -> dict:
         card["decision"] = "no_partner"
         card["recommended"] = best.dict() if best else None
         card["note"] = "This requester has no usual partner yet, so the best-fitting analyst is recommended."
+    elif best is not None and best.analyst_id != partner.analyst_id and partner.fit >= poor:
+        card["decision"] = "partner_busy"
+        card["recommended"] = best.dict()
+        card["note"] = (f"{partner.name} is the usual partner (fit {partner.fit:g}) but is {miss(partner)}% likely to miss "
+                        f"the deadline with their current queue. {best.name} is {miss(best)}% likely to miss, so "
+                        f"{best.name} is recommended; you can still choose {partner.name}.")
     elif partner.fit >= good:
         card["decision"] = "good"
         card["recommended"] = partner.dict()
@@ -211,7 +231,7 @@ def recommend(ticket: dict) -> dict:
             card["note"] = "Possible fit: assign to the usual partner and check in on progress."
     else:
         card["decision"] = "poor"
-        alt = next((c for c in cands if c.analyst_id != partner.analyst_id), best)
+        alt = best if best and best.analyst_id != partner.analyst_id else next((c for c in cands if c.analyst_id != partner.analyst_id), best)
         card["recommended"] = alt.dict() if alt else None
         card["note"] = (f"Poor fit for the usual partner ({partner.name}, fit {partner.fit:g}). "
                         f"Recommending {alt.name if alt else 'another analyst'} instead; the requester or lead can still choose "
