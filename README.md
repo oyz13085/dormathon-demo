@@ -6,8 +6,8 @@
 |---|---|
 | **Team** | Untitled (1) |
 | **Campus branch** | Taylor's University |
-| **Deployed app** | [`<DEPLOYED_LINK>`](#) |
-| **Pitch deck** | [`<PITCH_DECK_LINK>`](#) |
+| **Deployed app** | https://dormathon-demo.vercel.app |
+| **Pitch deck** | [Deck](https://drive.google.com/file/d/1bnzSwd8G2Y-zxefzB0P1uutXV1n1-4Do/view?usp=sharing) |
 
 ---
 
@@ -172,7 +172,7 @@ The demo has no login. Identities are picked from the role switcher. The ticket 
 
 ## Team
 
-**Untitled (1)**, Taylor's University
+**Untitled (1)**, University of Malaya
 
 - Gan Zi Xiang
 - Ooi Yong Zhe
