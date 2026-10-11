@@ -92,13 +92,17 @@ class Slot:
     queue_ahead: list[int] = field(default_factory=list)
 
 
-def ticket_hours(t: dict, handovers: int = 0) -> tuple[float, float, float, float]:
-    from fairqueue.models.hours import predict_hours_rules
+def ticket_hours(t: dict, handovers: int = 0, analyst: str | None = None) -> tuple[float, float, float, float]:
+    """Low / likely / high hours for a ticket. With `analyst`, scaled by that analyst's measured
+    speed on the ticket type, so the same ticket can cost different analysts different hours."""
+    from fairqueue.models.hours import predict_hours_rules, analyst_factor
     if t.get("pred_likely") is None:
         p = predict_hours_rules(t.get("category") or "", t.get("priority") or "Medium")
         low, likely, high = p["low"], p["likely"], p["high"]
     else:
         low, likely, high = t["pred_low"] or t["pred_likely"], t["pred_likely"], t["pred_high"] or t["pred_likely"]
+    f = analyst_factor(analyst, t.get("category") or "") if analyst else 1.0
+    low, likely, high = low * f, likely * f, high * f
     buffer = HANDOVER_BUFFER_HOURS * handovers
     return low + buffer, likely + buffer, high + buffer, buffer
 
@@ -122,7 +126,8 @@ def analyst_queue(analyst_id: int, extra_leave: list[tuple[str, str]] | None = N
 
     slots, before, ahead = [], 0.0, []
     for t in tickets:
-        low, likely, high, buf = ticket_hours(t, handovers.get(t["id"], 0))
+        # Tickets already queued keep their recorded estimate; the one being considered is estimated for this analyst
+        low, likely, high, buf = ticket_hours(t, handovers.get(t["id"], 0), analyst.get("name") if t is extra_ticket else None)
         dl = parse_day(t["deadline"])
         cap = working_hours(today, dl, off, per_day)
         cap_no_leave = working_hours(today, dl, off_no_leave, per_day)

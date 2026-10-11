@@ -80,6 +80,7 @@ export interface RiskItem {
   hours_available: number;
   expected_completion?: string | null;
   alert: boolean;
+  confidence?: { level: "High" | "Medium" | "Low"; reason: string };
 }
 export interface RiskList {
   threshold: number;
@@ -123,7 +124,7 @@ export interface RecommendationCard {
   hours: { low: number; likely: number; high: number };
   confidence: "High" | "Low";
   thresholds: { good_fit: number; poor_fit: number };
-  decision: "good" | "possible" | "poor" | "low_confidence" | "no_partner";
+  decision: "good" | "possible" | "poor" | "low_confidence" | "no_partner" | "partner_busy";
   note: string;
   explanation: string;
   facts: string[];
@@ -271,6 +272,7 @@ export interface PolicyResult {
   missed_deadlines: number; missed_pct: number; handovers_per_100: number; workload_spread_hours: number;
   alert_precision: number; alert_recall: number; alerts_per_day: number; cause_label_accuracy: number;
   by_department: Record<string, number>;
+  missed_range?: [number, number]; days_late?: number; handover_hours?: number;
 }
 export interface Replay {
   data_source: "synthetic" | "mendeley";
@@ -284,6 +286,11 @@ export interface Replay {
     agreement: { n_matched: number; n_not_matched: number; missed_pct_when_matched: number | null; missed_pct_when_not: number | null };
     conservative: { fairqueue_missed: number; conservative_missed: number };
   };
-  hours_model: { mae_model: number; mae_category_median: number; beats_baseline: boolean; interval_coverage_low_high: number } | null;
-  handover_model: { brier_model: number; brier_base_rate: number; beats_baseline: boolean } | null;
+  hours_model: { mae_model: number; mae_category_median: number; beats_baseline: boolean; interval_coverage_low_high: number;
+    method?: string; validation_mae?: Record<string, number>; test_mae?: Record<string, number> } | null;
+  handover_model: { brier_model: number; brier_base_rate: number; beats_baseline: boolean; method?: string } | null;
+  robustness?: { case: string; mae_model: number; mae_baseline: number; beats_baseline: boolean }[] | null;
+  alert_threshold?: { current: number; suggested: number; rule: string;
+    sweep: { threshold: number; precision: number | null; recall: number | null; alerts_per_day: number }[] };
+  focus_spread_hours?: number; handover_wait_days?: number; runs?: number;
 }

@@ -9,10 +9,14 @@ import pandas as pd
 from fairqueue.models.loader import load_model
 
 
-def predict_handover(category: str, priority: str, division: str, experience: int) -> float:
+def predict_handover(category: str, priority: str, division: str, experience: int,
+                     analyst: str | None = None) -> float:
     bundle = load_model("handover_model.pkl")
     if bundle is None:
         return 0.25 if experience == 0 else 0.05
+    emp = bundle.get("empirical")
+    if bundle.get("method") == "empirical" and emp:
+        return round(float(emp["rates"].get(f"{analyst}|{category}", emp["base"])), 3)
     from fairqueue.models.train import ticket_features
     X = ticket_features(pd.DataFrame([{"category": category, "priority": priority,
                                        "division": division,

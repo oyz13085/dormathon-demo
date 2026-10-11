@@ -217,25 +217,34 @@ def _synthetic_ticket(rng, np_rng, dept, day) -> dict:
 
 
 def _simulate_history_closures(df: pd.DataFrame, rng: random.Random) -> pd.DataFrame:
-    """Closures for the synthetic history: each analyst works their queue with a
-    randomly varying 4-8 focus hours a day (meetings, interruptions)."""
+    """Closures for the synthetic history: each analyst works their queue in arrival order
+    with a randomly varying 4-8 focus hours a day (meetings, interruptions). One budget per
+    analyst per day, shared by every ticket they touch that day."""
     free_at: dict[str, datetime] = {}
+    budget: dict[str, tuple[date, float, float]] = {}   # analyst -> (day, hours left, hours that day)
     closed = []
     for _, t in df.iterrows():
         a = t["assignee"]
         cursor = max(free_at.get(a, t["created_at"]), t["created_at"])
         remaining = float(t["actual_hours"])
-        while remaining > 0:
+        while remaining > 1e-9:
             if not _weekday(cursor):
-                cursor = (cursor + timedelta(days=1)).replace(hour=9)
+                cursor = (cursor + timedelta(days=1)).replace(hour=9, minute=0)
                 continue
-            focus = rng.uniform(4, 8)
-            used = min(remaining, focus)
+            day, left, total = budget.get(a, (None, 0.0, 0.0))
+            if day != cursor.date():
+                total = rng.uniform(4, 8)
+                day, left = cursor.date(), total
+            if left <= 1e-9:
+                cursor = (cursor + timedelta(days=1)).replace(hour=9, minute=0)
+                continue
+            used = min(remaining, left)
             remaining -= used
-            if remaining > 0:
-                cursor = (cursor + timedelta(days=1)).replace(hour=9)
-            else:
-                cursor = cursor + timedelta(hours=used)
+            left -= used
+            budget[a] = (day, left, total)
+            cursor = cursor + timedelta(hours=used * 8 / total)   # the day's focus is spread over 8 working hours
+            if remaining > 1e-9:
+                cursor = (cursor + timedelta(days=1)).replace(hour=9, minute=0)
         if t["handovers"]:
             cursor += timedelta(days=1)  # waiting for the next analyst to pick it up
         free_at[a] = cursor

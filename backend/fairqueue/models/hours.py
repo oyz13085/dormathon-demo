@@ -35,13 +35,23 @@ def known_categories() -> list[str]:
     return list(CATEGORY_MEDIANS)
 
 
+def analyst_factor(analyst: str | None, category: str) -> float:
+    """Measured speed of this analyst on this category (1.0 when unknown or no model)."""
+    bundle = load_model("hours_model.pkl")
+    if not bundle or not analyst:
+        return 1.0
+    from fairqueue.models.train import analyst_effect
+    return analyst_effect(bundle.get("empirical"), analyst, category)
+
+
 def predict_hours(category: str, priority: str, division: str,
-                  created_at: str | None = None) -> dict:
+                  created_at: str | None = None, analyst: str | None = None) -> dict:
+    """Hours for a ticket. With `analyst`, adjusted for how fast that analyst usually is on the type."""
     bundle = load_model("hours_model.pkl")
     if bundle is None:
         return predict_hours_rules(category, priority)
 
-    from fairqueue.models.train import ticket_features, MIN_CATEGORY_COUNT
+    from fairqueue.models.train import ticket_features, empirical_likely, analyst_effect, MIN_CATEGORY_COUNT
     n_seen = bundle["category_counts"].get(category, 0)
     if n_seen < MIN_CATEGORY_COUNT:
         # Unfamiliar ticket type: no confident guess. Wide range around the overall median.
@@ -50,11 +60,17 @@ def predict_hours(category: str, priority: str, division: str,
         return {"low": round(likely * 0.4, 1), "likely": likely, "high": round(likely * 2.5, 1),
                 "confidence": "Low", "method": "model"}
 
-    created = created_at or datetime.now().isoformat(sep=" ")
-    X = ticket_features(pd.DataFrame([{"category": category, "priority": priority,
-                                       "division": division, "created_at": created}]),
-                        bundle["categories"])
-    vals = {k: float(np.expm1(m.predict(X)[0])) for k, m in bundle["models"].items()}
-    low, likely, high = sorted([vals["low"], vals["likely"], vals["high"]])
+    emp = bundle.get("empirical")
+    if bundle.get("method") == "empirical" and emp:
+        likely = float(empirical_likely(emp, [category], [priority])[0])
+        vals = {"low": likely * emp["band"][0], "likely": likely, "high": likely * emp["band"][1]}
+    else:
+        created = created_at or datetime.now().isoformat(sep=" ")
+        X = ticket_features(pd.DataFrame([{"category": category, "priority": priority,
+                                           "division": division, "created_at": created}]),
+                            bundle["categories"])
+        vals = {k: float(np.expm1(m.predict(X)[0])) for k, m in bundle["models"].items()}
+    f = analyst_effect(emp, analyst, category)
+    low, likely, high = sorted([vals["low"] * f, vals["likely"] * f, vals["high"] * f])
     return {"low": round(max(low, 0.5), 1), "likely": round(max(likely, 1.0), 1),
             "high": round(max(high, likely), 1), "confidence": "High", "method": "model"}

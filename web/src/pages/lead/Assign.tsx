@@ -22,6 +22,7 @@ const DECISION: Record<CardData['decision'], { label: string; color: string; ton
   poor: { label: 'Poor fit · someone else recommended', color: theme.colors.red, tone: 'error' },
   low_confidence: { label: 'New ticket type · you decide', color: theme.colors.sand, tone: 'warn' },
   no_partner: { label: 'No usual partner · best fit', color: theme.colors.ink, tone: 'info' },
+  partner_busy: { label: 'Usual partner likely to miss · safer analyst', color: theme.colors.accent, tone: 'warn' },
 };
 
 const isRisky = (t: Ticket) => t.status !== 'Closed' && (t.alert || (t.p_miss ?? 0) >= 0.3);

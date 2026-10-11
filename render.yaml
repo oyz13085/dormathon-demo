@@ -6,8 +6,16 @@ services:
     buildCommand: pip install -r requirements.txt && python -m fairqueue.models.train
     # Reseed on every start so the demo always begins from the same story
     startCommand: python -m fairqueue.db.seed && uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
     envVars:
+      # The Vercel URL of the frontend (comma-separate several), for CORS
       - key: FRONTEND_URL
         sync: false
+      # config.yaml picks the provider (currently groq); only that provider's key is needed.
+      # Without a key the agents fall back to rules, labelled "rule-based".
+      - key: GROQ_API_KEY
+        sync: false
       - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
         sync: false
