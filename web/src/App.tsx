@@ -57,9 +57,6 @@ function TopBar() {
   return (
     <header className="fq-topbar">
       <Link to={NAV[role][0].path} style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 8 }}>
-        <span style={{ width: 28, height: 28, borderRadius: 8, background: theme.colors.accent, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <span style={{ color: '#fff', fontWeight: 800, fontSize: 13 }}>FQ</span>
-        </span>
         <span className="fq-brand-name" style={{ fontWeight: 700, fontSize: 15, color: theme.colors.ink }}>FairQueue</span>
       </Link>
 
@@ -88,7 +85,7 @@ function TopBar() {
         {identities.length > 0 && (
           <select value={user} onChange={e => setUser(e.target.value)} aria-label="Who are you?" style={{
             padding: '5px 8px', borderRadius: 10, border: `1.5px solid ${theme.colors.track}`, fontSize: 12, background: theme.colors.card,
-            fontFamily: 'inherit', color: theme.colors.ink, minWidth: 0,
+            fontFamily: 'inherit', color: theme.colors.ink, minWidth: 177,
           }}>
             {identities.map(i => <option key={i.value} value={i.value}>{i.label}</option>)}
           </select>

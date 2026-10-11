@@ -124,9 +124,10 @@ export default function NewTicket() {
                 return (
                   <button key={p} role="radio" aria-checked={on} onClick={() => { setPriority(p); setPriorityTouched(true); }} style={{
                     padding: '9px 4px', borderRadius: 12, cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4,
                     border: `1.5px solid ${on ? PRIORITY_COLOR[p] : suggested ? PRIORITY_COLOR[p] + '80' : theme.colors.track}`,
                     background: on ? PRIORITY_COLOR[p] : theme.colors.card, color: on ? '#fff' : theme.colors.ink,
-                  }}>{p}{suggested && <Sparkles size={11} style={{ marginLeft: 4, verticalAlign: -1 }} />}</button>
+                  }}>{p}{suggested && <Sparkles size={11} />}</button>
                 );
               })}
             </div>
